@@ -192,7 +192,7 @@ function DashboardLayoutContent({
                 <div className="flex items-center gap-2 min-w-0">
                   <Music2 className="h-4 w-4 text-amber-400 shrink-0" />
                   <span className="font-serif font-medium text-sidebar-foreground truncate text-sm tracking-wide">
-                    吹奏楽部ポータル
+                    TMGW Brass Band Portal
                   </span>
                 </div>
               )}
