@@ -4,32 +4,43 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import DashboardLayout from "./components/DashboardLayout";
 import Home from "./pages/Home";
+import Announcements from "./pages/Announcements";
+import MonthlySchedule from "./pages/MonthlySchedule";
+import WeeklySchedule from "./pages/WeeklySchedule";
+import LessonVisits from "./pages/LessonVisits";
+import Events from "./pages/Events";
+import Practice from "./pages/Practice";
+import Absence from "./pages/Absence";
+import AdminUsers from "./pages/AdminUsers";
+import AdminApprovals from "./pages/AdminApprovals";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+    <DashboardLayout>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/announcements" component={Announcements} />
+        <Route path="/schedule/monthly" component={MonthlySchedule} />
+        <Route path="/schedule/weekly" component={WeeklySchedule} />
+        <Route path="/lessons" component={LessonVisits} />
+        <Route path="/events" component={Events} />
+        <Route path="/practice" component={Practice} />
+        <Route path="/absence" component={Absence} />
+        <Route path="/admin/users" component={AdminUsers} />
+        <Route path="/admin/approvals" component={AdminApprovals} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </DashboardLayout>
   );
 }
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />
