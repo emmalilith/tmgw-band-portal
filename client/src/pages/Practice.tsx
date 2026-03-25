@@ -28,20 +28,23 @@ import { toast } from "sonner";
 const practiceTypeConfig = {
   ensemble: {
     label: "合奏",
-    color: "border-l-blue-500 bg-blue-50",
-    badge: "bg-blue-100 text-blue-800 border-blue-200",
+    color: "border-l-violet-500 bg-violet-50",
+    badge: "bg-violet-100 text-violet-800 border-violet-200",
+    cardBg: "from-violet-50 to-purple-50",
     icon: "🎼",
   },
   individual: {
     label: "個人練習",
-    color: "border-l-green-500 bg-green-50",
-    badge: "bg-green-100 text-green-800 border-green-200",
+    color: "border-l-emerald-500 bg-emerald-50",
+    badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    cardBg: "from-emerald-50 to-teal-50",
     icon: "🎵",
   },
   section: {
     label: "パート練習",
-    color: "border-l-purple-500 bg-purple-50",
-    badge: "bg-purple-100 text-purple-800 border-purple-200",
+    color: "border-l-pink-500 bg-pink-50",
+    badge: "bg-pink-100 text-pink-800 border-pink-200",
+    cardBg: "from-pink-50 to-rose-50",
     icon: "🎶",
   },
 };
@@ -99,8 +102,8 @@ export default function Practice() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-light">本日の練習予定</h1>
-          <p className="text-sm text-muted-foreground mt-1">合奏・個人・パート練習の管理</p>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>🎼</span> 本日の練習予定</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">合奏・個人・パート練習の管理</p>
         </div>
         {canManage && (
           <Button onClick={openCreate} className="gap-2">
@@ -116,10 +119,10 @@ export default function Practice() {
           <ChevronLeft className="w-4 h-4" />
         </Button>
         <div className="text-center">
-          <p className="font-serif text-xl font-medium">
+          <p className="font-black text-xl">
             {format(selectedDate, "M月d日（E）", { locale: ja })}
           </p>
-          {isToday && <p className="text-xs text-primary font-medium">今日</p>}
+          {isToday && <p className="text-xs font-black text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">今日</p>}
         </div>
         <Button variant="outline" size="icon" onClick={() => setSelectedDate(d => addDays(d, 1))}>
           <ChevronRight className="w-4 h-4" />
@@ -136,13 +139,13 @@ export default function Practice() {
           {practices.map(p => {
             const cfg = practiceTypeConfig[p.practiceType];
             return (
-              <Card key={p.id} className={`border shadow-sm border-l-4 ${cfg.color}`}>
+              <Card key={p.id} className={`border-0 shadow-md rounded-2xl border-l-4 overflow-hidden bg-gradient-to-r ${cfg.cardBg} ${cfg.color}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <span className="text-lg">{cfg.icon}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ${cfg.badge}`}>
+                        <span className="text-2xl">{cfg.icon}</span>
+                        <span className={`text-xs px-3 py-1 rounded-full border font-bold ${cfg.badge}`}>
                           {cfg.label}
                         </span>
                         {p.startTime && (
@@ -160,9 +163,9 @@ export default function Practice() {
                       </div>
 
                       {p.practiceType === "ensemble" && p.repertoire && (
-                        <div className="mt-2">
-                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">演奏曲目</p>
-                          <p className="text-sm font-medium text-foreground whitespace-pre-wrap">{p.repertoire}</p>
+                        <div className="mt-3 bg-white/60 rounded-xl p-3">
+                          <p className="text-xs font-black text-violet-600 uppercase tracking-wider mb-1">🎵 演奏曲目</p>
+                          <p className="text-sm font-bold text-foreground whitespace-pre-wrap">{p.repertoire}</p>
                         </div>
                       )}
 
@@ -185,10 +188,10 @@ export default function Practice() {
           })}
         </div>
       ) : (
-        <Card className="border shadow-sm">
+        <Card className="border-0 shadow-md rounded-2xl">
           <CardContent className="py-16 text-center text-muted-foreground">
-            <Music2 className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p>この日の練習予定はありません</p>
+            <div className="text-5xl mb-4 opacity-30">🎼</div>
+            <p className="font-medium">この日の練習予定はありません</p>
             {canManage && (
               <button onClick={openCreate} className="text-sm text-primary hover:underline mt-2 block mx-auto">
                 練習予定を追加する
@@ -202,7 +205,7 @@ export default function Practice() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif font-medium">練習予定を追加</DialogTitle>
+            <DialogTitle className="font-bold text-lg">🎼 練習予定を追加</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">

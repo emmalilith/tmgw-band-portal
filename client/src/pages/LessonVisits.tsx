@@ -58,11 +58,11 @@ export default function LessonVisits() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-light">レッスン講師来訪ボード</h1>
-          <p className="text-sm text-muted-foreground mt-1">外部講師の来訪予定を確認できます</p>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>🎓</span> レッスン講師来訪ボード</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">外部講師の来訪予定を確認できます</p>
         </div>
         {isAdmin && (
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
+          <Button onClick={() => setDialogOpen(true)} className="gap-2 rounded-xl font-bold shadow-md">
             <Plus className="w-4 h-4" />
             追加する
           </Button>
@@ -77,8 +77,8 @@ export default function LessonVisits() {
         <>
           {/* Upcoming */}
           <div className="space-y-4">
-            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-              今後の来訪予定
+            <h2 className="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-1">
+              📅 今後の来訪予定
             </h2>
             {upcoming.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -88,31 +88,32 @@ export default function LessonVisits() {
                   return (
                     <Card
                       key={v.id}
-                      className={`border shadow-sm transition-all hover:shadow-md ${isToday ? "border-amber-300 bg-amber-50/50" : ""}`}
+                      className={`border-0 shadow-md rounded-2xl transition-all hover:-translate-y-0.5 hover:shadow-lg overflow-hidden ${isToday ? "ring-2 ring-amber-400" : ""}`}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-2">
+                      <CardContent className="p-0">
+                        <div className={`h-2 ${isToday ? "bg-gradient-to-r from-amber-400 to-orange-500" : "bg-gradient-to-r from-violet-500 to-purple-600"}`} />
+                        <div className="p-4 flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <GraduationCap className="w-5 h-5 text-primary" />
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-md">
+                                <span className="text-2xl">🎓</span>
                               </div>
                               <div>
-                                <p className="font-medium text-foreground">{v.instructorName} 先生</p>
+                                <p className="font-black text-foreground">{v.instructorName} 先生</p>
                                 {v.targetPart && (
-                                  <p className="text-xs text-muted-foreground">{v.targetPart}</p>
+                                  <p className="text-xs font-bold text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full inline-block mt-0.5">{v.targetPart}</p>
                                 )}
                               </div>
                             </div>
-                            <div className="space-y-1 pl-12">
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <div className="space-y-1 pl-0">
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                                 <Calendar className="w-3 h-3" />
                                 <span>{format(parseISO(v.visitDate), "yyyy年M月d日（E）", { locale: ja })}</span>
                                 {isToday && (
-                                  <span className="text-amber-600 font-medium">今日！</span>
+                                  <span className="text-white font-bold bg-amber-500 px-2 py-0.5 rounded-full">🔥 今日！</span>
                                 )}
                                 {!isToday && daysUntil > 0 && (
-                                  <span className="text-primary font-medium">{daysUntil}日後</span>
+                                  <span className="text-violet-600 font-bold">{daysUntil}日後</span>
                                 )}
                               </div>
                               {v.startTime && (
@@ -147,10 +148,10 @@ export default function LessonVisits() {
                 })}
               </div>
             ) : (
-              <Card className="border shadow-sm">
+              <Card className="border-0 shadow-md rounded-2xl">
                 <CardContent className="py-12 text-center text-muted-foreground">
-                  <GraduationCap className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                  <p>今後の来訪予定はありません</p>
+                  <div className="text-5xl mb-4 opacity-30">🎓</div>
+                  <p className="font-medium">今後の来訪予定はありません</p>
                 </CardContent>
               </Card>
             )}
@@ -193,7 +194,7 @@ export default function LessonVisits() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif font-medium">レッスン来訪を追加</DialogTitle>
+            <DialogTitle className="font-bold text-lg">🎓 レッスン来訪を追加</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">

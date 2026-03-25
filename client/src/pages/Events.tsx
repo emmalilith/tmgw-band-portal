@@ -27,9 +27,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const typeConfig = {
-  concert: { label: "演奏会", icon: Music2, color: "from-blue-900 via-indigo-900 to-slate-900" },
-  competition: { label: "コンクール", icon: Trophy, color: "from-amber-900 via-orange-900 to-slate-900" },
-  other: { label: "その他", icon: Calendar, color: "from-slate-800 via-slate-900 to-slate-900" },
+  concert: { label: "🎺 演奏会", icon: Music2, color: "from-violet-600 via-purple-600 to-pink-600", glow: "shadow-violet-500/30" },
+  competition: { label: "🏆 コンクール", icon: Trophy, color: "from-amber-500 via-orange-500 to-red-500", glow: "shadow-amber-500/30" },
+  other: { label: "🎉 その他", icon: Calendar, color: "from-sky-500 via-blue-500 to-indigo-600", glow: "shadow-sky-500/30" },
 };
 
 export default function Events() {
@@ -75,8 +75,8 @@ export default function Events() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-light">演奏会カウントダウン</h1>
-          <p className="text-sm text-muted-foreground mt-1">演奏会・コンクールまでの日数を確認</p>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>🎺</span> 演奏会カウントダウン</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">演奏会・コンクールまでの日数を確認</p>
         </div>
         {isAdmin && (
           <Button onClick={() => setDialogOpen(true)} className="gap-2">
@@ -102,26 +102,26 @@ export default function Events() {
                 return (
                   <div
                     key={e.id}
-                    className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${cfg.color} p-6 text-white shadow-xl`}
+                    className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${cfg.color} p-6 text-white shadow-2xl ${cfg.glow}`}
                   >
                     {/* Decorative circles */}
                     <div className="absolute inset-0 opacity-10 pointer-events-none">
-                      <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full border border-white/30" />
-                      <div className="absolute -top-4 -right-4 w-32 h-32 rounded-full border border-white/20" />
+                      <div className="absolute -top-8 -right-8 w-64 h-64 rounded-full bg-white/20" />
+                      <div className="absolute top-1/2 -right-12 w-40 h-40 rounded-full bg-white/10" />
+                      <div className="absolute -bottom-4 -left-4 w-32 h-32 rounded-full bg-white/10" />
                     </div>
 
                     <div className="relative flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-3">
-                          <Icon className="w-4 h-4 text-amber-400" />
-                          <span className="text-xs text-amber-400 uppercase tracking-widest font-medium">{cfg.label}</span>
+                          <span className="text-sm bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full font-bold">{cfg.label}</span>
                           {e.featured && (
-                            <span className="flex items-center gap-1 text-xs text-amber-300">
+                            <span className="flex items-center gap-1 text-xs bg-yellow-400/30 text-yellow-200 px-2 py-1 rounded-full font-bold">
                               <Star className="w-3 h-3 fill-current" /> メイン
                             </span>
                           )}
                         </div>
-                        <h2 className="font-serif text-2xl font-light text-white mb-2">{e.title}</h2>
+                        <h2 className="text-2xl font-black text-white mb-2">{e.title}</h2>
                         {e.venue && (
                           <div className="flex items-center gap-1.5 text-sm text-slate-300 mb-1">
                             <MapPin className="w-3.5 h-3.5" />
@@ -138,11 +138,10 @@ export default function Events() {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <div className="flex items-end gap-1 justify-end">
-                          <span className="font-serif text-7xl font-light text-amber-400 leading-none">{daysLeft}</span>
-                          <span className="text-slate-300 mb-2 text-xl">日</span>
+                        <div className="text-center bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-3">
+                          <div className="text-7xl font-black text-white leading-none">{daysLeft}</div>
+                          <div className="text-white/70 text-sm font-bold mt-1">日後</div>
                         </div>
-                        <p className="text-xs text-slate-500">まで</p>
                         {isAdmin && (
                           <div className="flex items-center gap-2 mt-3 justify-end">
                             <button

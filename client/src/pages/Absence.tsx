@@ -27,25 +27,29 @@ import { toast } from "sonner";
 
 type AbsenceStatus = "pending" | "section_approved" | "teacher_approved" | "rejected";
 
-const statusConfig: Record<AbsenceStatus, { label: string; color: string; icon: React.ReactNode }> = {
+const statusConfig: Record<AbsenceStatus, { label: string; color: string; icon: React.ReactNode; bar: string }> = {
   pending: {
-    label: "申請中",
+    label: "⏳ 申請中",
     color: "bg-amber-50 text-amber-700 border-amber-200",
+    bar: "bg-amber-400",
     icon: <Clock className="w-3.5 h-3.5" />,
   },
   section_approved: {
-    label: "パートリーダー承認済",
+    label: "✅ パートリーダー承認済",
     color: "bg-blue-50 text-blue-700 border-blue-200",
+    bar: "bg-blue-400",
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
   },
   teacher_approved: {
-    label: "承認完了",
+    label: "🎉 承認完了",
     color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    bar: "bg-emerald-400",
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
   },
   rejected: {
-    label: "却下",
+    label: "❌ 却下",
     color: "bg-red-50 text-red-700 border-red-200",
+    bar: "bg-red-400",
     icon: <XCircle className="w-3.5 h-3.5" />,
   },
 };
@@ -83,8 +87,8 @@ export default function Absence() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-light">遅刻・欠席申請</h1>
-          <p className="text-sm text-muted-foreground mt-1">申請はパートリーダー・先生の承認が必要です</p>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>📝</span> 遅刻・欠席申請</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">申請はパートリーダー・先生の承認が必要です</p>
         </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" />
@@ -93,23 +97,23 @@ export default function Absence() {
       </div>
 
       {/* Approval flow explanation */}
-      <Card className="border shadow-sm bg-secondary/30">
+      <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-r from-violet-50 to-pink-50">
         <CardContent className="p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">承認フロー</p>
+          <p className="text-xs font-black text-violet-600 uppercase tracking-widest mb-3">🔄 承認フロー</p>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2 text-sm">
-              <div className="w-6 h-6 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center text-xs font-bold text-amber-700">1</div>
-              <span>申請提出</span>
+              <div className="w-8 h-8 rounded-xl bg-amber-400 flex items-center justify-center text-xs font-black text-white shadow-md">1</div>
+              <span className="font-bold">申請提出</span>
             </div>
-            <span className="text-muted-foreground">→</span>
+            <span className="text-muted-foreground font-black">→</span>
             <div className="flex items-center gap-2 text-sm">
-              <div className="w-6 h-6 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-bold text-blue-700">2</div>
-              <span>パートリーダー確認</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-400 flex items-center justify-center text-xs font-black text-white shadow-md">2</div>
+              <span className="font-bold">パートリーダー確認</span>
             </div>
-            <span className="text-muted-foreground">→</span>
+            <span className="text-muted-foreground font-black">→</span>
             <div className="flex items-center gap-2 text-sm">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center text-xs font-bold text-emerald-700">3</div>
-              <span>先生の最終承認</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-400 flex items-center justify-center text-xs font-black text-white shadow-md">3</div>
+              <span className="font-bold">先生の最終承認</span>
             </div>
           </div>
         </CardContent>
@@ -122,22 +126,23 @@ export default function Absence() {
         </div>
       ) : myRequests && myRequests.length > 0 ? (
         <div className="space-y-3">
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest">申請履歴</h2>
+          <h2 className="text-xs font-black text-violet-600 uppercase tracking-widest">📝 申請履歴</h2>
           {myRequests.map(r => {
             const status = r.status as AbsenceStatus;
             const cfg = statusConfig[status];
             return (
-              <Card key={r.id} className="border shadow-sm">
+              <Card key={r.id} className="border-0 shadow-md rounded-2xl overflow-hidden">
+                <div className={`h-1.5 ${cfg.bar}`} />
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${cfg.color}`}>
+                        <span className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border font-bold ${cfg.color}`}>
                           {cfg.icon}
                           {cfg.label}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ${r.requestType === "absence" ? "bg-red-50 text-red-700 border-red-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
-                          {r.requestType === "absence" ? "欠席" : "遅刻"}
+                        <span className={`text-xs px-3 py-1 rounded-full border font-bold ${r.requestType === "absence" ? "bg-red-50 text-red-700 border-red-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
+                          {r.requestType === "absence" ? "🚫 欠席" : "⏰ 遅刻"}
                         </span>
                       </div>
                       <p className="text-sm font-medium">
@@ -176,10 +181,10 @@ export default function Absence() {
           })}
         </div>
       ) : (
-        <Card className="border shadow-sm">
+        <Card className="border-0 shadow-md rounded-2xl">
           <CardContent className="py-16 text-center text-muted-foreground">
-            <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p>申請履歴はありません</p>
+            <div className="text-5xl mb-4 opacity-30">📝</div>
+            <p className="font-medium">申請履歴はありません</p>
           </CardContent>
         </Card>
       )}
@@ -188,7 +193,7 @@ export default function Absence() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif font-medium">遅刻・欠席申請</DialogTitle>
+            <DialogTitle className="font-bold text-lg">📝 遅刻・欠席申請</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">

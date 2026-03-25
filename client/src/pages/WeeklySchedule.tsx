@@ -20,11 +20,11 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 
 const typeConfig = {
-  practice: { label: "練習", color: "border-l-blue-500 bg-blue-50", badge: "bg-blue-100 text-blue-700" },
-  event: { label: "イベント", color: "border-l-purple-500 bg-purple-50", badge: "bg-purple-100 text-purple-700" },
-  lesson: { label: "レッスン", color: "border-l-amber-500 bg-amber-50", badge: "bg-amber-100 text-amber-700" },
-  concert: { label: "演奏会", color: "border-l-red-500 bg-red-50", badge: "bg-red-100 text-red-700" },
-  holiday: { label: "休日", color: "border-l-gray-400 bg-gray-50", badge: "bg-gray-100 text-gray-600" },
+  practice: { label: "🎵 練習", color: "border-l-violet-500 bg-violet-50", badge: "bg-violet-100 text-violet-700" },
+  event: { label: "🎉 イベント", color: "border-l-pink-500 bg-pink-50", badge: "bg-pink-100 text-pink-700" },
+  lesson: { label: "🎓 レッスン", color: "border-l-amber-500 bg-amber-50", badge: "bg-amber-100 text-amber-700" },
+  concert: { label: "🎺 演奏会", color: "border-l-red-500 bg-red-50", badge: "bg-red-100 text-red-700" },
+  holiday: { label: "🌴 休日", color: "border-l-slate-400 bg-slate-50", badge: "bg-slate-100 text-slate-600" },
 };
 
 export default function WeeklySchedule() {
@@ -51,19 +51,19 @@ export default function WeeklySchedule() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-light">週間スケジュール</h1>
-          <p className="text-sm text-muted-foreground mt-1">今週の練習・イベント詳細</p>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>🗓️</span> 週間スケジュール</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">今週の練習・イベント詳細</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(d => subWeeks(d, 1))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div className="text-center min-w-[160px]">
-            <p className="font-serif text-sm font-medium">
+            <p className="font-black text-sm">
               {format(currentWeekStart, "M月d日", { locale: ja })} 〜 {format(weekEnd, "M月d日", { locale: ja })}
             </p>
             {isCurrentWeek && (
-              <span className="text-xs text-primary font-medium">今週</span>
+              <span className="text-xs font-black text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">今週</span>
             )}
           </div>
           <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(d => addWeeks(d, 1))}>
@@ -88,32 +88,32 @@ export default function WeeklySchedule() {
             return (
               <Card
                 key={day.toISOString()}
-                className={`border shadow-sm transition-all ${isTodayDay ? "border-primary/30 bg-primary/2" : ""}`}
+                className={`border-0 shadow-md rounded-2xl transition-all overflow-hidden ${isTodayDay ? "ring-2 ring-violet-400" : ""}`}
               >
                 <CardContent className="p-0">
                   <div className="flex">
                     {/* Day column */}
                     <div
-                      className={`w-20 shrink-0 flex flex-col items-center justify-center py-4 rounded-l-xl border-r ${
+                      className={`w-20 shrink-0 flex flex-col items-center justify-center py-4 ${
                         isTodayDay
-                          ? "bg-primary text-primary-foreground"
+                          ? "bg-gradient-to-b from-violet-600 to-purple-700 text-white"
                           : isWeekend
-                          ? "bg-secondary/80"
-                          : "bg-secondary/40"
+                          ? "bg-slate-100"
+                          : "bg-white"
                       }`}
                     >
                       <span
-                        className={`text-xs font-medium ${
-                          isTodayDay ? "text-primary-foreground/70" : dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-muted-foreground"
+                        className={`text-xs font-black ${
+                          isTodayDay ? "text-white/80" : dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-muted-foreground"
                         }`}
                       >
                         {format(day, "E", { locale: ja })}
                       </span>
-                      <span className={`text-2xl font-serif font-light ${isTodayDay ? "text-primary-foreground" : ""}`}>
+                      <span className={`text-2xl font-black ${isTodayDay ? "text-white" : ""}`}>
                         {format(day, "d")}
                       </span>
                       {isTodayDay && (
-                        <span className="text-xs text-primary-foreground/70 mt-0.5">今日</span>
+                        <span className="text-xs text-white/80 mt-0.5 font-bold">今日</span>
                       )}
                     </div>
 
@@ -129,7 +129,7 @@ export default function WeeklySchedule() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cfg.badge}`}>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${cfg.badge}`}>
                                     {cfg.label}
                                   </span>
                                   {s.startTime && (

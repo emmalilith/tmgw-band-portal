@@ -28,9 +28,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const categoryConfig = {
-  info: { label: "お知らせ", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  warning: { label: "注意", color: "bg-amber-50 text-amber-700 border-amber-200" },
-  important: { label: "重要", color: "bg-red-50 text-red-700 border-red-200" },
+  info: { label: "ℹ️ お知らせ", color: "bg-blue-100 text-blue-700", border: "border-l-blue-400", bg: "from-blue-50 to-indigo-50" },
+  warning: { label: "⚠️ 注意", color: "bg-orange-100 text-orange-700", border: "border-l-orange-400", bg: "from-orange-50 to-amber-50" },
+  important: { label: "🚨 重要", color: "bg-red-100 text-red-700", border: "border-l-red-500", bg: "from-red-50 to-pink-50" },
 };
 
 type FormData = {
@@ -92,11 +92,11 @@ export default function Announcements() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-light">連絡事項掲示板</h1>
-          <p className="text-sm text-muted-foreground mt-1">部員への重要なお知らせを確認できます</p>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>📢</span> 連絡事項掲示板</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">部員への重要なお知らせを確認できます</p>
         </div>
         {canManage && (
-          <Button onClick={openCreate} className="gap-2">
+          <Button onClick={openCreate} className="gap-2 rounded-xl font-bold shadow-md">
             <Plus className="w-4 h-4" />
             投稿する
           </Button>
@@ -114,8 +114,8 @@ export default function Announcements() {
           {/* Pinned */}
           {pinned.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                <Pin className="w-3 h-3" /> ピン留め
+              <h2 className="text-xs font-bold text-orange-600 uppercase tracking-widest flex items-center gap-2">
+                📌 ピン留め
               </h2>
               {pinned.map(a => (
                 <AnnouncementCard key={a.id} a={a} canManage={canManage} onEdit={openEdit} onDelete={id => deleteMutation.mutate({ id })} />
@@ -139,8 +139,8 @@ export default function Announcements() {
 
           {announcements?.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
-              <Bell className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>連絡事項はありません</p>
+              <div className="text-6xl mb-4 opacity-30">📢</div>
+              <p className="font-medium">連絡事項はありません</p>
             </div>
           )}
         </>
@@ -150,8 +150,8 @@ export default function Announcements() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-serif font-medium">
-              {editingId ? "連絡事項を編集" : "連絡事項を投稿"}
+            <DialogTitle className="font-bold text-lg">
+              {editingId ? "✏️ 連絡事項を編集" : "📝 連絡事項を投稿"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -209,32 +209,30 @@ function AnnouncementCard({
 }) {
   const cfg = categoryConfig[a.category];
   return (
-    <Card className="border shadow-sm hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              {a.pinned && <span className="text-amber-500 text-xs">📌</span>}
-              <span className={`text-xs px-2 py-0.5 rounded border font-medium ${cfg.color}`}>{cfg.label}</span>
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(a.createdAt), "yyyy年M月d日", { locale: ja })}
-              </span>
-            </div>
-            <h3 className="font-medium text-foreground">{a.title}</h3>
-            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap leading-relaxed">{a.content}</p>
+    <div className={`rounded-2xl bg-gradient-to-r ${cfg.bg} border-l-4 ${cfg.border} p-4 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            {a.pinned && <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">📌 ピン留め</span>}
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${cfg.color}`}>{cfg.label}</span>
+            <span className="text-xs text-muted-foreground font-medium">
+              {format(new Date(a.createdAt), "yyyy年M月d日", { locale: ja })}
+            </span>
           </div>
-          {canManage && (
-            <div className="flex items-center gap-1 shrink-0">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(a)}>
-                <Edit2 className="w-3.5 h-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(a.id)}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          )}
+          <h3 className="font-bold text-foreground">{a.title}</h3>
+          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap leading-relaxed">{a.content}</p>
         </div>
-      </CardContent>
-    </Card>
+        {canManage && (
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => onEdit(a)}>
+              <Edit2 className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-destructive hover:text-destructive" onClick={() => onDelete(a.id)}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -84,30 +84,30 @@ export default function AdminApprovals() {
       rejected: "bg-red-50 text-red-700 border-red-200",
     };
     const labels: Record<string, string> = {
-      pending: "申請中",
-      section_approved: "パートリーダー承認済",
-      teacher_approved: "承認完了",
-      rejected: "却下",
+      pending: "⏳ 申請中",
+      section_approved: "✅ パートリーダー承認済",
+      teacher_approved: "🎉 承認完了",
+      rejected: "❌ 却下",
     };
     return (
-      <span className={`text-xs px-2 py-0.5 rounded border font-medium ${map[status] ?? "bg-gray-50 text-gray-700 border-gray-200"}`}>
+      <span className={`text-xs px-3 py-1 rounded-full border font-bold ${map[status] ?? "bg-gray-50 text-gray-700 border-gray-200"}`}>
         {labels[status] ?? status}
       </span>
     );
   };
 
   const RequestCard = ({ r, showActions }: { r: AbsenceRequest; showActions: boolean }) => (
-    <Card className="border shadow-sm">
+    <Card className="border-0 shadow-md rounded-2xl overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {statusBadge(r.status)}
-              <span className={`text-xs px-2 py-0.5 rounded border font-medium ${r.requestType === "absence" ? "bg-red-50 text-red-700 border-red-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
-                {r.requestType === "absence" ? "欠席" : "遅刻"}
+              <span className={`text-xs px-3 py-1 rounded-full border font-bold ${r.requestType === "absence" ? "bg-red-50 text-red-700 border-red-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
+                {r.requestType === "absence" ? "🚫 欠席" : "⏰ 遅刻"}
               </span>
             </div>
-            <p className="font-medium text-sm">
+            <p className="font-bold text-sm">
               {r.requester?.name ?? "不明"} さん
             </p>
             <p className="text-sm text-muted-foreground">
@@ -161,8 +161,8 @@ export default function AdminApprovals() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="font-serif text-3xl font-light">申請承認</h1>
-        <p className="text-sm text-muted-foreground mt-1">遅刻・欠席申請の承認・却下を行います</p>
+        <h1 className="text-3xl font-black flex items-center gap-2"><span>🛡️</span> 申請承認</h1>
+        <p className="text-sm text-muted-foreground mt-1 font-medium">遅刻・欠席申請の承認・却下を行います</p>
       </div>
 
       <Tabs defaultValue="pending">
@@ -170,7 +170,7 @@ export default function AdminApprovals() {
           <TabsTrigger value="pending">
             承認待ち
             {pendingForMe.length > 0 && (
-              <span className="ml-1.5 bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
+              <span className="ml-1.5 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
                 {pendingForMe.length}
               </span>
             )}
@@ -187,10 +187,10 @@ export default function AdminApprovals() {
           ) : pendingForMe.length > 0 ? (
             pendingForMe.map(r => <RequestCard key={r.id} r={r as AbsenceRequest} showActions={true} />)
           ) : (
-            <Card className="border shadow-sm">
+            <Card className="border-0 shadow-md rounded-2xl">
               <CardContent className="py-12 text-center text-muted-foreground">
-                <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                <p>承認待ちの申請はありません</p>
+                <div className="text-5xl mb-4 opacity-30">🎉</div>
+                <p className="font-medium">承認待ちの申請はありません</p>
               </CardContent>
             </Card>
           )}

@@ -38,11 +38,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const typeConfig = {
-  practice: { label: "練習", color: "bg-blue-500" },
-  event: { label: "イベント", color: "bg-purple-500" },
-  lesson: { label: "レッスン", color: "bg-amber-500" },
-  concert: { label: "演奏会", color: "bg-red-500" },
-  holiday: { label: "休日", color: "bg-gray-400" },
+  practice: { label: "🎵 練習", color: "bg-violet-500", dot: "bg-violet-500" },
+  event: { label: "🎉 イベント", color: "bg-pink-500", dot: "bg-pink-500" },
+  lesson: { label: "🎓 レッスン", color: "bg-amber-500", dot: "bg-amber-500" },
+  concert: { label: "🎺 演奏会", color: "bg-red-500", dot: "bg-red-500" },
+  holiday: { label: "🌴 休日", color: "bg-slate-400", dot: "bg-slate-400" },
 };
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -112,14 +112,14 @@ export default function MonthlySchedule() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-light">月間スケジュール</h1>
-          <p className="text-sm text-muted-foreground mt-1">月ごとの練習・イベント予定</p>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>📅</span> 月間スケジュール</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">月ごとの練習・イベント予定</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="font-serif text-lg font-medium w-32 text-center">
+          <span className="font-black text-lg w-32 text-center">
             {format(currentDate, "yyyy年M月", { locale: ja })}
           </span>
           <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
@@ -131,14 +131,14 @@ export default function MonthlySchedule() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Calendar */}
         <div className="lg:col-span-3">
-          <Card className="border shadow-sm">
+          <Card className="border-0 shadow-md bg-white rounded-2xl">
             <CardContent className="p-4">
               {/* Weekday headers */}
               <div className="grid grid-cols-7 mb-2">
                 {WEEKDAYS.map((d, i) => (
                   <div
                     key={d}
-                    className={`text-center text-xs font-medium py-2 ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-muted-foreground"}`}
+                    className={`text-center text-xs font-black py-2 ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-muted-foreground"}`}
                   >
                     {d}
                   </div>
@@ -157,16 +157,16 @@ export default function MonthlySchedule() {
                     <button
                       key={day.toISOString()}
                       onClick={() => setSelectedDay(isSameDay(day, selectedDay ?? new Date(0)) ? null : day)}
-                      className={`min-h-[72px] p-1.5 rounded-lg text-left transition-all border ${
+                      className={`min-h-[72px] p-1.5 rounded-xl text-left transition-all border-2 ${
                         isSelected
-                          ? "border-primary bg-primary/5"
-                          : "border-transparent hover:border-border hover:bg-secondary/50"
+                          ? "border-violet-400 bg-violet-50"
+                          : "border-transparent hover:border-violet-200 hover:bg-violet-50/50"
                       }`}
                     >
                       <span
-                        className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1 ${
+                        className={`text-xs font-black w-6 h-6 flex items-center justify-center rounded-full mb-1 ${
                           isToday(day)
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md"
                             : dow === 0
                             ? "text-red-500"
                             : dow === 6
@@ -199,9 +199,9 @@ export default function MonthlySchedule() {
           {/* Legend */}
           <div className="flex flex-wrap gap-3 mt-3">
             {Object.entries(typeConfig).map(([key, cfg]) => (
-              <div key={key} className="flex items-center gap-1.5">
-                <div className={`w-2.5 h-2.5 rounded-full ${cfg.color}`} />
-                <span className="text-xs text-muted-foreground">{cfg.label}</span>
+              <div key={key} className="flex items-center gap-1.5 bg-white rounded-full px-3 py-1 shadow-sm border">
+                <div className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
+                <span className="text-xs font-bold text-muted-foreground">{cfg.label}</span>
               </div>
             ))}
           </div>
@@ -210,10 +210,10 @@ export default function MonthlySchedule() {
         {/* Day detail */}
         <div className="lg:col-span-1">
           {selectedDay ? (
-            <Card className="border shadow-sm sticky top-6">
+            <Card className="border-0 shadow-md bg-white rounded-2xl sticky top-6">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="font-serif text-base font-medium">
+                  <CardTitle className="font-black text-base">
                     {format(selectedDay, "M月d日（E）", { locale: ja })}
                   </CardTitle>
                   {canManage && (
@@ -226,13 +226,13 @@ export default function MonthlySchedule() {
               <CardContent className="space-y-2">
                 {selectedSchedules.length > 0 ? (
                   selectedSchedules.map(s => (
-                    <div key={s.id} className="p-2.5 rounded-lg border bg-card">
+                    <div key={s.id} className="p-3 rounded-xl border-l-4 border-l-violet-400 bg-violet-50">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className={`text-xs text-white rounded px-1.5 py-0.5 inline-block mb-1 ${typeConfig[s.type].color}`}>
+                          <div className={`text-xs text-white rounded-full px-2 py-0.5 inline-block mb-1 font-bold ${typeConfig[s.type].color}`}>
                             {typeConfig[s.type].label}
                           </div>
-                          <p className="text-sm font-medium truncate">{s.title}</p>
+                          <p className="text-sm font-bold truncate">{s.title}</p>
                           {s.startTime && (
                             <p className="text-xs text-muted-foreground">{s.startTime}{s.endTime ? ` 〜 ${s.endTime}` : ""}</p>
                           )}
@@ -255,9 +255,10 @@ export default function MonthlySchedule() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="border shadow-sm">
+            <Card className="border-0 shadow-md bg-white rounded-2xl">
               <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                日付を選択すると<br />詳細が表示されます
+                <div className="text-4xl mb-3 opacity-40">📅</div>
+                <p className="font-medium">日付を選択すると<br />詳細が表示されます</p>
               </CardContent>
             </Card>
           )}
@@ -268,7 +269,7 @@ export default function MonthlySchedule() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif font-medium">スケジュールを追加</DialogTitle>
+            <DialogTitle className="font-bold text-lg">🗓️ スケジュールを追加</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">

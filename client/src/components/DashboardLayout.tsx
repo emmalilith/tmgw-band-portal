@@ -1,6 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +37,7 @@ import {
   Music2,
   PanelLeft,
   Settings,
+  Sparkles,
   Star,
   Users,
 } from "lucide-react";
@@ -45,22 +45,21 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
-import { trpc } from "@/lib/trpc";
 
 const mainMenuItems = [
-  { icon: LayoutDashboard, label: "ダッシュボード", path: "/" },
-  { icon: Bell, label: "連絡事項", path: "/announcements" },
-  { icon: CalendarRange, label: "月間スケジュール", path: "/schedule/monthly" },
-  { icon: CalendarDays, label: "週間スケジュール", path: "/schedule/weekly" },
-  { icon: GraduationCap, label: "レッスン講師", path: "/lessons" },
-  { icon: Star, label: "演奏会カウントダウン", path: "/events" },
-  { icon: Music2, label: "本日の練習", path: "/practice" },
-  { icon: BookOpen, label: "遅刻・欠席申請", path: "/absence" },
+  { icon: LayoutDashboard, label: "ダッシュボード", path: "/", emoji: "🏠" },
+  { icon: Bell, label: "連絡事項", path: "/announcements", emoji: "📢" },
+  { icon: CalendarRange, label: "月間スケジュール", path: "/schedule/monthly", emoji: "📅" },
+  { icon: CalendarDays, label: "週間スケジュール", path: "/schedule/weekly", emoji: "🗓️" },
+  { icon: GraduationCap, label: "レッスン講師", path: "/lessons", emoji: "🎓" },
+  { icon: Star, label: "演奏会カウントダウン", path: "/events", emoji: "🎺" },
+  { icon: Music2, label: "本日の練習", path: "/practice", emoji: "🎵" },
+  { icon: BookOpen, label: "遅刻・欠席申請", path: "/absence", emoji: "📝" },
 ];
 
 const adminMenuItems = [
-  { icon: Users, label: "メンバー管理", path: "/admin/users" },
-  { icon: Settings, label: "申請承認", path: "/admin/approvals" },
+  { icon: Users, label: "メンバー管理", path: "/admin/users", emoji: "👥" },
+  { icon: Settings, label: "申請承認", path: "/admin/approvals", emoji: "✅" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -74,10 +73,10 @@ function getRoleLabel(role?: string) {
   return "部員";
 }
 
-function getRoleBadgeColor(role?: string) {
-  if (role === "admin") return "bg-amber-500/20 text-amber-300 border-amber-500/30";
-  if (role === "section_leader") return "bg-blue-500/20 text-blue-300 border-blue-500/30";
-  return "bg-slate-500/20 text-slate-300 border-slate-500/30";
+function getRoleBadgeStyle(role?: string) {
+  if (role === "admin") return "bg-orange-400/30 text-orange-200 border-orange-400/40";
+  if (role === "section_leader") return "bg-sky-400/30 text-sky-200 border-sky-400/40";
+  return "bg-white/20 text-white/80 border-white/30";
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -95,24 +94,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-        <div className="flex flex-col items-center gap-8 p-10 max-w-md w-full">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-pink-500">
+        {/* Decorative blobs */}
+        <div className="absolute top-20 left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-20 right-20 w-80 h-80 bg-orange-400/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col items-center gap-8 p-10 max-w-md w-full">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-              <Music2 className="w-8 h-8 text-amber-400" />
+            <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-xl">
+              <span className="text-4xl">🎺</span>
             </div>
-            <h1 className="text-3xl font-serif font-light tracking-wide text-white text-center">
-              吹奏楽部ポータル
+            <h1 className="text-4xl font-bold tracking-tight text-white text-center drop-shadow-lg">
+              TMGW Brass Band
             </h1>
-            <p className="text-sm text-slate-400 text-center leading-relaxed">
-              部員専用のポータルサイトです。<br />ログインして続けてください。
+            <p className="text-sm text-white/80 text-center leading-relaxed">
+              部員専用ポータルへようこそ！<br />ログインして練習を始めよう 🎵
             </p>
           </div>
           <Button
             onClick={() => { window.location.href = getLoginUrl(); }}
             size="lg"
-            className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-medium shadow-lg"
+            className="w-full bg-white text-violet-700 hover:bg-white/90 font-bold shadow-xl text-base rounded-xl"
           >
+            <Sparkles className="w-4 h-4 mr-2" />
             ログイン
           </Button>
         </div>
@@ -145,6 +148,9 @@ function DashboardLayoutContent({
   const isMobile = useIsMobile();
   const activeItem = [...mainMenuItems, ...adminMenuItems].find(i => i.path === location);
 
+  const isAdmin = user?.role === "admin";
+  const isLeaderOrAdmin = user?.role === "admin" || user?.role === "section_leader";
+
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -171,28 +177,32 @@ function DashboardLayoutContent({
     };
   }, [isResizing, setSidebarWidth]);
 
-  const isAdmin = user?.role === "admin";
-  const isLeaderOrAdmin = user?.role === "admin" || user?.role === "section_leader";
-
   return (
     <>
       <div className="relative" ref={sidebarRef}>
-        <Sidebar collapsible="icon" className="border-r-0" disableTransition={isResizing}>
+        <Sidebar
+          collapsible="icon"
+          className="border-r-0"
+          disableTransition={isResizing}
+          style={{
+            background: "linear-gradient(180deg, oklch(0.38 0.2 290) 0%, oklch(0.32 0.22 300) 50%, oklch(0.28 0.2 310) 100%)",
+          }}
+        >
           {/* Header */}
-          <SidebarHeader className="h-16 justify-center border-b border-sidebar-border/50">
+          <SidebarHeader className="h-16 justify-center border-b border-white/10">
             <div className="flex items-center gap-3 px-2 w-full">
               <button
                 onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-sidebar-accent rounded-lg transition-colors shrink-0"
+                className="h-8 w-8 flex items-center justify-center hover:bg-white/15 rounded-xl transition-colors shrink-0"
                 aria-label="Toggle navigation"
               >
-                <PanelLeft className="h-4 w-4 text-sidebar-foreground/60" />
+                <PanelLeft className="h-4 w-4 text-white/70" />
               </button>
               {!isCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <Music2 className="h-4 w-4 text-amber-400 shrink-0" />
-                  <span className="font-serif font-medium text-sidebar-foreground truncate text-sm tracking-wide">
-                    TMGW Brass Band Portal
+                  <span className="text-lg shrink-0">🎺</span>
+                  <span className="font-bold text-white truncate text-sm tracking-wide">
+                    TMGW Brass Band
                   </span>
                 </div>
               )}
@@ -200,14 +210,14 @@ function DashboardLayoutContent({
           </SidebarHeader>
 
           {/* Main Nav */}
-          <SidebarContent className="gap-0 py-2">
+          <SidebarContent className="gap-0 py-3">
             <SidebarGroup>
               {!isCollapsed && (
-                <SidebarGroupLabel className="text-xs text-sidebar-foreground/40 uppercase tracking-widest px-4 mb-1">
+                <SidebarGroupLabel className="text-xs text-white/40 uppercase tracking-widest px-4 mb-1 font-bold">
                   メニュー
                 </SidebarGroupLabel>
               )}
-              <SidebarMenu className="px-2">
+              <SidebarMenu className="px-2 gap-0.5">
                 {mainMenuItems.map(item => {
                   const isActive = location === item.path;
                   return (
@@ -216,10 +226,14 @@ function DashboardLayoutContent({
                         isActive={isActive}
                         onClick={() => setLocation(item.path)}
                         tooltip={item.label}
-                        className="h-9 transition-all font-normal text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                        className={`h-10 transition-all rounded-xl font-semibold text-sm
+                          ${isActive
+                            ? "bg-white/20 text-white shadow-sm"
+                            : "text-white/70 hover:text-white hover:bg-white/10"
+                          }`}
                       >
-                        <item.icon className={`h-4 w-4 ${isActive ? "text-amber-400" : ""}`} />
-                        <span className="text-sm">{item.label}</span>
+                        <span className="text-base w-5 text-center shrink-0">{item.emoji}</span>
+                        <span>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -229,13 +243,13 @@ function DashboardLayoutContent({
 
             {/* Admin / Leader section */}
             {isLeaderOrAdmin && (
-              <SidebarGroup className="mt-2">
+              <SidebarGroup className="mt-3">
                 {!isCollapsed && (
-                  <SidebarGroupLabel className="text-xs text-sidebar-foreground/40 uppercase tracking-widest px-4 mb-1">
+                  <SidebarGroupLabel className="text-xs text-white/40 uppercase tracking-widest px-4 mb-1 font-bold">
                     管理
                   </SidebarGroupLabel>
                 )}
-                <SidebarMenu className="px-2">
+                <SidebarMenu className="px-2 gap-0.5">
                   {adminMenuItems.map(item => {
                     if (item.path === "/admin/users" && !isAdmin) return null;
                     const isActive = location === item.path;
@@ -245,10 +259,14 @@ function DashboardLayoutContent({
                           isActive={isActive}
                           onClick={() => setLocation(item.path)}
                           tooltip={item.label}
-                          className="h-9 transition-all font-normal text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                          className={`h-10 transition-all rounded-xl font-semibold text-sm
+                            ${isActive
+                              ? "bg-white/20 text-white shadow-sm"
+                              : "text-white/70 hover:text-white hover:bg-white/10"
+                            }`}
                         >
-                          <item.icon className={`h-4 w-4 ${isActive ? "text-amber-400" : ""}`} />
-                          <span className="text-sm">{item.label}</span>
+                          <span className="text-base w-5 text-center shrink-0">{item.emoji}</span>
+                          <span>{item.label}</span>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -259,29 +277,29 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           {/* Footer */}
-          <SidebarFooter className="p-3 border-t border-sidebar-border/50">
+          <SidebarFooter className="p-3 border-t border-white/10">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-sidebar-accent transition-colors w-full text-left focus:outline-none">
-                  <Avatar className="h-8 w-8 shrink-0 border border-sidebar-border">
-                    <AvatarFallback className="text-xs font-medium bg-amber-500/20 text-amber-300">
+                <button className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-white/10 transition-colors w-full text-left focus:outline-none">
+                  <Avatar className="h-8 w-8 shrink-0 border-2 border-white/30">
+                    <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-orange-400 to-pink-500 text-white">
                       {user?.name?.charAt(0).toUpperCase() ?? "?"}
                     </AvatarFallback>
                   </Avatar>
                   {!isCollapsed && (
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-sidebar-foreground leading-none">
+                      <p className="text-sm font-bold truncate text-white leading-none">
                         {user?.name ?? "-"}
                       </p>
-                      <span className={`text-xs px-1.5 py-0.5 rounded border mt-1 inline-block ${getRoleBadgeColor(user?.role)}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-md border mt-1 inline-block font-semibold ${getRoleBadgeStyle(user?.role)}`}>
                         {getRoleLabel(user?.role)}
                       </span>
                     </div>
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
+              <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive rounded-lg">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>ログアウト</span>
                 </DropdownMenuItem>
@@ -292,7 +310,7 @@ function DashboardLayoutContent({
 
         {/* Resize handle */}
         <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-amber-400/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-violet-400/30 transition-colors ${isCollapsed ? "hidden" : ""}`}
           onMouseDown={() => { if (!isCollapsed) setIsResizing(true); }}
           style={{ zIndex: 50 }}
         />
@@ -302,8 +320,8 @@ function DashboardLayoutContent({
         {isMobile && (
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-4 backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-3">
-              <SidebarTrigger className="h-9 w-9 rounded-lg" />
-              <span className="font-medium text-sm">{activeItem?.label ?? "メニュー"}</span>
+              <SidebarTrigger className="h-9 w-9 rounded-xl" />
+              <span className="font-bold text-sm">{activeItem?.label ?? "メニュー"}</span>
             </div>
           </div>
         )}

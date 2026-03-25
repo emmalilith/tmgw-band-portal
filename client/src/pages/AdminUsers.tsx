@@ -17,10 +17,10 @@ import { toast } from "sonner";
 
 
 const roleConfig = {
-  admin: { label: "顧問", color: "bg-amber-100 text-amber-800 border-amber-200" },
-  section_leader: { label: "パートリーダー", color: "bg-blue-100 text-blue-800 border-blue-200" },
-  member: { label: "部員", color: "bg-slate-100 text-slate-700 border-slate-200" },
-  user: { label: "部員", color: "bg-slate-100 text-slate-700 border-slate-200" },
+  admin: { label: "🎓 顧問", color: "bg-amber-100 text-amber-800 border-amber-200" },
+  section_leader: { label: "⭐ パートリーダー", color: "bg-blue-100 text-blue-800 border-blue-200" },
+  member: { label: "🎵 部員", color: "bg-violet-100 text-violet-700 border-violet-200" },
+  user: { label: "🎵 部員", color: "bg-violet-100 text-violet-700 border-violet-200" },
 };
 
 export default function AdminUsers() {
@@ -47,41 +47,45 @@ export default function AdminUsers() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="font-serif text-3xl font-light">メンバー管理</h1>
-        <p className="text-sm text-muted-foreground mt-1">部員のロールと権限を管理します</p>
+        <h1 className="text-3xl font-black flex items-center gap-2"><span>👥</span> メンバー管理</h1>
+        <p className="text-sm text-muted-foreground mt-1 font-medium">部員のロールと権限を管理します</p>
       </div>
 
       {/* Role explanation */}
-      <Card className="border shadow-sm bg-secondary/30">
-        <CardContent className="p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">ロール説明</p>
-          <div className="grid grid-cols-3 gap-3 text-sm">
-            <div>
-              <span className="inline-block text-xs px-2 py-0.5 rounded border font-medium bg-amber-100 text-amber-800 border-amber-200 mb-1">顧問</span>
-              <p className="text-xs text-muted-foreground">全機能へのアクセス、欠席申請の最終承認</p>
-            </div>
-            <div>
-              <span className="inline-block text-xs px-2 py-0.5 rounded border font-medium bg-blue-100 text-blue-800 border-blue-200 mb-1">パートリーダー</span>
-              <p className="text-xs text-muted-foreground">欠席申請の一次承認、練習予定の管理</p>
-            </div>
-            <div>
-              <span className="inline-block text-xs px-2 py-0.5 rounded border font-medium bg-slate-100 text-slate-700 border-slate-200 mb-1">部員</span>
-              <p className="text-xs text-muted-foreground">閲覧・申請のみ</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50">
+          <CardContent className="p-4">
+            <div className="text-2xl mb-2">🎓</div>
+            <p className="font-black text-sm text-amber-800 mb-1">顧問</p>
+            <p className="text-xs text-amber-700/70">全機能へのアクセス、欠席申請の最終承認</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50">
+          <CardContent className="p-4">
+            <div className="text-2xl mb-2">⭐</div>
+            <p className="font-black text-sm text-blue-800 mb-1">パートリーダー</p>
+            <p className="text-xs text-blue-700/70">欠席申請の一次承認、練習予定の管理</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-br from-violet-50 to-purple-50">
+          <CardContent className="p-4">
+            <div className="text-2xl mb-2">🎵</div>
+            <p className="font-black text-sm text-violet-800 mb-1">部員</p>
+            <p className="text-xs text-violet-700/70">閲覧・申請のみ</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4].map(i => <div key={i} className="h-16 rounded-xl bg-secondary animate-pulse" />)}
         </div>
       ) : (
-        <Card className="border shadow-sm">
+        <Card className="border-0 shadow-md rounded-2xl">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 font-serif text-lg font-medium">
-              <Users className="w-5 h-5 text-primary" />
-              部員一覧 ({members?.length ?? 0}名)
+            <CardTitle className="flex items-center gap-2 font-black text-lg">
+              <Users className="w-5 h-5 text-violet-600" />
+              🎵 部員一覧 ({members?.length ?? 0}名)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
