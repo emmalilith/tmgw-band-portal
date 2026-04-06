@@ -36,6 +36,8 @@ import {
   updateUserRole,
   createAbsenceRequest,
   getAbsenceRequestsByUser,
+  getEnsembleAttendanceByDate,
+  getEnsembleDatesWithAbsences,
 } from "./db";
 
 // ─── Role helpers ─────────────────────────────────────────────────────────────
@@ -290,7 +292,17 @@ export const appRouter = router({
       .mutation(({ input }) => deletePracticeSchedule(input.id)),
   }),
 
-  // ─── Absence Requests ──────────────────────────────────────────────────────
+  //  // ─── Ensemble Attendance Board ──────────────────────────────────────
+  ensembleAttendance: router({
+    byDate: protectedProcedure
+      .input(z.object({ date: z.string() }))
+      .query(({ input }) => getEnsembleAttendanceByDate(input.date)),
+    datesInMonth: protectedProcedure
+      .input(z.object({ yearMonth: z.string() }))
+      .query(({ input }) => getEnsembleDatesWithAbsences(input.yearMonth)),
+  }),
+
+  // ─── Absence Requests ──────────────────────────────────────────────
   absence: router({
     myRequests: protectedProcedure.query(({ ctx }) =>
       getAbsenceRequestsByUser(ctx.user.id)
@@ -300,10 +312,11 @@ export const appRouter = router({
     create: protectedProcedure
       .input(
         z.object({
-          requestType: z.enum(["absence", "late"]),
-          targetDate: z.string(),
-          arrivalTime: z.string().optional(),
-          reason: z.string().min(1),
+      requestType: z.enum(["absence", "late", "early_leave"]),
+      targetDate: z.string(),
+      arrivalTime: z.string().optional(),
+      leaveTime: z.string().optional(),
+      reason: z.string().min(1),
         })
       )
       .mutation(({ ctx, input }) =>

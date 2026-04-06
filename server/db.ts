@@ -47,7 +47,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const values: InsertUser = { openId: user.openId };
   const updateSet: Record<string, unknown> = {};
 
-  const textFields = ["name", "email", "loginMethod"] as const;
+  const textFields = ["name", "email", "loginMethod", "passwordHash", "part"] as const;
   for (const field of textFields) {
     const value = user[field];
     if (value === undefined) continue;
@@ -308,4 +308,90 @@ export async function updateAbsenceRequest(id: number, data: Partial<AbsenceRequ
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(absenceRequests).set(data).where(eq(absenceRequests.id, id));
+}
+
+// ─── Ensemble Attendance Board ────────────────────────────────────────────────
+/**
+ * For a given ensemble practice date, returns:
+ *   - the practice schedule entry (if type = ensemble)
+ *   - all teacher_approved absence requests for that date with requester info
+ */
+export async function getEnsembleAttendanceByDate(date: string) {
+  const db = await getDb();
+  if (!db) return { practice: null, absences: [] };
+
+  // Get the ensemble practice schedule for that date
+  const practiceRows = await db
+    .select()
+    .from(practiceSchedules)
+    .where(
+      and(
+        sql`${practiceSchedules.practiceDate} = ${date}`,
+        eq(practiceSchedules.practiceType, "ensemble")
+      )
+    )
+    .limit(1);
+
+  const practice = practiceRows[0] ?? null;
+
+  // Get all approved absence requests for that date (join with user info)
+  const absenceRows = await db
+    .select({
+      id: absenceRequests.id,
+      requestType: absenceRequests.requestType,
+      targetDate: absenceRequests.targetDate,
+      arrivalTime: absenceRequests.arrivalTime,
+      leaveTime: absenceRequests.leaveTime,
+      reason: absenceRequests.reason,
+      status: absenceRequests.status,
+      createdAt: absenceRequests.createdAt,
+      requesterName: users.name,
+      requesterPart: users.part,
+      requesterId: users.id,
+    })
+    .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
+    .where(
+      and(
+        sql`${absenceRequests.targetDate} = ${date}`,
+        eq(absenceRequests.status, "teacher_approved")
+      )
+    )
+    .orderBy(absenceRequests.requestType, users.part, users.name);
+
+  return { practice, absences: absenceRows };
+}
+
+/**
+ * Returns all ensemble practice dates that have at least one approved absence,
+ * within a given month (YYYY-MM).
+ */
+export async function getEnsembleDatesWithAbsences(yearMonth: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const start = `${yearMonth}-01`;
+  const end = `${yearMonth}-31`;
+
+  // Get ensemble practice dates in the month
+  const practiceRows = await db
+    .select({ practiceDate: practiceSchedules.practiceDate })
+    .from(practiceSchedules)
+    .where(
+      and(
+        eq(practiceSchedules.practiceType, "ensemble"),
+        sql`${practiceSchedules.practiceDate} >= ${start}`,
+        sql`${practiceSchedules.practiceDate} <= ${end}`
+      )
+    )
+    .orderBy(practiceSchedules.practiceDate);
+
+  return practiceRows.map((r) => r.practiceDate);
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return result[0];
 }

@@ -15,6 +15,8 @@ import Practice from "./pages/Practice";
 import Absence from "./pages/Absence";
 import AdminUsers from "./pages/AdminUsers";
 import AdminApprovals from "./pages/AdminApprovals";
+import EnsembleAttendance from "./pages/EnsembleAttendance";
+import Login from "./pages/Login";
 
 function Router() {
   return (
@@ -30,6 +32,8 @@ function Router() {
         <Route path="/absence" component={Absence} />
         <Route path="/admin/users" component={AdminUsers} />
         <Route path="/admin/approvals" component={AdminApprovals} />
+        <Route path="/ensemble-attendance" component={EnsembleAttendance} />
+        <Route path="/login" component={Login} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

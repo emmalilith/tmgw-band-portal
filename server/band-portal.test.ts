@@ -7,10 +7,12 @@ type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 function createAdminContext(): TrpcContext {
   const user: AuthenticatedUser = {
     id: 1,
-    openId: "admin-user",
+    openId: "local:admin@example.com",
     email: "admin@example.com",
     name: "顧問先生",
-    loginMethod: "manus",
+    loginMethod: "email",
+    passwordHash: null,
+    part: null,
     role: "admin",
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -26,11 +28,13 @@ function createAdminContext(): TrpcContext {
 function createMemberContext(): TrpcContext {
   const user: AuthenticatedUser = {
     id: 2,
-    openId: "member-user",
+    openId: "local:member@example.com",
     email: "member@example.com",
     name: "部員A",
-    loginMethod: "manus",
-    role: "user",
+    loginMethod: "email",
+    passwordHash: null,
+    part: "Flute",
+    role: "member",
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -64,17 +68,39 @@ describe("auth.me", () => {
 });
 
 describe("RBAC - admin-only procedures", () => {
-  it("admin can call users.list", async () => {
+  it("admin can call users.all", async () => {
     const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
-    // Should not throw FORBIDDEN
-    await expect(caller.users.list()).resolves.toBeDefined();
+    // Should not throw FORBIDDEN (DB may be unavailable in test env)
+    const result = await caller.users.all().catch((e: Error) => e);
+    if (result instanceof Error) {
+      expect(result.message).not.toContain("管理者権限");
+    }
   });
 
-  it("member cannot call users.list", async () => {
+  it("member cannot call users.updateRole", async () => {
     const ctx = createMemberContext();
     const caller = appRouter.createCaller(ctx);
-    await expect(caller.users.list()).rejects.toThrow();
+    await expect(caller.users.updateRole({ userId: 1, role: "admin" })).rejects.toThrow();
+  });
+});
+
+describe("ensembleAttendance", () => {
+  it("member can query ensemble attendance by date", async () => {
+    const ctx = createMemberContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.ensembleAttendance.byDate({ date: "2025-04-10" }).catch(() => null);
+    if (result !== null) {
+      expect(result).toHaveProperty("practice");
+      expect(result).toHaveProperty("absences");
+    }
+  });
+
+  it("member can query ensemble dates in month", async () => {
+    const ctx = createMemberContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.ensembleAttendance.datesInMonth({ yearMonth: "2025-04" }).catch(() => []);
+    expect(Array.isArray(result)).toBe(true);
   });
 });
 

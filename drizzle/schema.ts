@@ -16,6 +16,8 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  /** メール/パスワード認証用 bcryptハッシュ */
+  passwordHash: varchar("passwordHash", { length: 255 }),
   /** admin = 顧問先生, section_leader = パートリーダー, member = 一般部員 */
   role: mysqlEnum("role", ["admin", "section_leader", "member"]).default("member").notNull(),
   /** 所属パート (e.g. Flute, Clarinet, Trumpet …) */
@@ -123,11 +125,13 @@ export type InsertPracticeSchedule = typeof practiceSchedules.$inferInsert;
 export const absenceRequests = mysqlTable("absence_requests", {
   id: int("id").autoincrement().primaryKey(),
   requesterId: int("requesterId").notNull(),
-  /** absence | late */
-  requestType: mysqlEnum("requestType", ["absence", "late"]).notNull(),
+  /** absence | late | early_leave */
+  requestType: mysqlEnum("requestType", ["absence", "late", "early_leave"]).notNull(),
   targetDate: varchar("targetDate", { length: 10 }).notNull(),
   /** 遅刻の場合の到着予定時刻 */
   arrivalTime: varchar("arrivalTime", { length: 8 }),
+  /** 早退の場合の退出予定時刻 */
+  leaveTime: varchar("leaveTime", { length: 8 }),
   reason: text("reason").notNull(),
   /** pending | section_approved | teacher_approved | rejected */
   status: mysqlEnum("status", ["pending", "section_approved", "teacher_approved", "rejected"]).default("pending").notNull(),

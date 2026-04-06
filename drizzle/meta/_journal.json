@@ -15,6 +15,13 @@
       "when": 1774412651499,
       "tag": "0001_friendly_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1775450514733,
+      "tag": "0002_dusty_newton_destine",
+      "breakpoints": true
     }
   ]
 }

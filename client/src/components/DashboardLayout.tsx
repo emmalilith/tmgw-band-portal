@@ -39,6 +39,7 @@ import {
   Settings,
   Sparkles,
   Star,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -55,6 +56,7 @@ const mainMenuItems = [
   { icon: Star, label: "演奏会カウントダウン", path: "/events", emoji: "🎺" },
   { icon: Music2, label: "本日の練習", path: "/practice", emoji: "🎵" },
   { icon: BookOpen, label: "遅刻・欠席申請", path: "/absence", emoji: "📝" },
+  { icon: UserCheck, label: "合奏出欠ボード", path: "/ensemble-attendance", emoji: "🎼" },
 ];
 
 const adminMenuItems = [
@@ -111,7 +113,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </p>
           </div>
           <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
+            onClick={() => { window.location.href = "/login"; }}
             size="lg"
             className="w-full bg-white text-violet-700 hover:bg-white/90 font-bold shadow-xl text-base rounded-xl"
           >
