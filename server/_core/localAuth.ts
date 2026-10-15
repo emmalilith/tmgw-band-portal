@@ -15,6 +15,9 @@ import type { User } from "../../drizzle/schema";
 
 // ─── JWT helpers ──────────────────────────────────────────────────────────────
 function getSecret() {
+  if (!ENV.cookieSecret) {
+    throw new Error("JWT_SECRET must be set before local authentication can be used");
+  }
   return new TextEncoder().encode(ENV.cookieSecret);
 }
 
@@ -59,12 +62,19 @@ export function registerLocalAuthRoutes(app: Express) {
   /**
    * POST /api/auth/register
    * Body: { name, email, password, part? }
-   * Creates the first user as admin, subsequent users as member.
+   * ADMIN_EMAIL is the recommended deterministic administrator bootstrap.
+   * If it is absent, the first registered account is promoted as a fallback.
    */
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     const { name, email, password, part } = req.body ?? {};
-    if (!name || !email || !password) {
+    const normalizedName = typeof name === "string" ? name.trim() : "";
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!normalizedName || !normalizedEmail || typeof password !== "string") {
       res.status(400).json({ error: "name, email and password are required" });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ error: "パスワードは8文字以上で設定してください" });
       return;
     }
 
@@ -73,23 +83,26 @@ export function registerLocalAuthRoutes(app: Express) {
       const isFirstUser = allUsers.length === 0;
 
       // Check if email already exists
-      const existing = await db.getUserByEmail(email);
+      const existing = await db.getUserByEmail(normalizedEmail);
       if (existing) {
         res.status(409).json({ error: "このメールアドレスはすでに登録されています" });
         return;
       }
 
       const passwordHash = await bcrypt.hash(password, 12);
-      const openId = `local:${email}`;
+      const openId = `local:${normalizedEmail}`;
+      const role = ENV.adminEmail === normalizedEmail || (!ENV.adminEmail && isFirstUser)
+        ? "admin"
+        : "member";
 
       await db.upsertUser({
         openId,
-        name,
-        email,
+        name: normalizedName,
+        email: normalizedEmail,
         loginMethod: "email",
         passwordHash,
         part: part ?? null,
-        role: isFirstUser ? "admin" : "member",
+        role,
         lastSignedIn: new Date(),
       });
 
@@ -99,7 +112,7 @@ export function registerLocalAuthRoutes(app: Express) {
         return;
       }
 
-      const token = await signSession(openId, name);
+      const token = await signSession(openId, normalizedName);
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
@@ -115,13 +128,14 @@ export function registerLocalAuthRoutes(app: Express) {
    */
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const { email, password } = req.body ?? {};
-    if (!email || !password) {
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!normalizedEmail || typeof password !== "string") {
       res.status(400).json({ error: "email and password are required" });
       return;
     }
 
     try {
-      const user = await db.getUserByEmail(email);
+      const user = await db.getUserByEmail(normalizedEmail);
       if (!user || !user.passwordHash) {
         res.status(401).json({ error: "メールアドレスまたはパスワードが正しくありません" });
         return;

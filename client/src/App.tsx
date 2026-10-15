@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
@@ -19,6 +19,14 @@ import EnsembleAttendance from "./pages/EnsembleAttendance";
 import Login from "./pages/Login";
 
 function Router() {
+  const [location] = useLocation();
+
+  // The sign-in page must stay outside the authenticated shell. Otherwise the
+  // dashboard's unauthenticated state hides the form before a member can log in.
+  if (location === "/login") {
+    return <Login />;
+  }
+
   return (
     <DashboardLayout>
       <Switch>
@@ -33,7 +41,6 @@ function Router() {
         <Route path="/admin/users" component={AdminUsers} />
         <Route path="/admin/approvals" component={AdminApprovals} />
         <Route path="/ensemble-attendance" component={EnsembleAttendance} />
-        <Route path="/login" component={Login} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

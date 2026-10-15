@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
+import type { User } from "../drizzle/schema";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -52,12 +53,17 @@ const leaderOrAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+function toClientUser(user: User) {
+  const { passwordHash: _passwordHash, ...safeUser } = user;
+  return safeUser;
+}
+
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
 
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query((opts) => (opts.ctx.user ? toClientUser(opts.ctx.user) : null)),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -67,7 +73,7 @@ export const appRouter = router({
 
   // ─── Users ─────────────────────────────────────────────────────────────────
   users: router({
-    list: adminProcedure.query(() => getAllUsers()),
+    list: adminProcedure.query(async () => (await getAllUsers()).map(toClientUser)),
     updateRole: adminProcedure
       .input(
         z.object({

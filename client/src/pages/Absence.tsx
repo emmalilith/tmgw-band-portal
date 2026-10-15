@@ -26,6 +26,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 type AbsenceStatus = "pending" | "section_approved" | "teacher_approved" | "rejected";
+type RequestType = "absence" | "late" | "early_leave";
+
+const requestTypeConfig: Record<RequestType, { label: string; color: string }> = {
+  absence: { label: "🚫 欠席", color: "bg-red-50 text-red-700 border-red-200" },
+  late: { label: "⏰ 遅刻", color: "bg-orange-50 text-orange-700 border-orange-200" },
+  early_leave: { label: "🚪 早退", color: "bg-blue-50 text-blue-700 border-blue-200" },
+};
 
 const statusConfig: Record<AbsenceStatus, { label: string; color: string; icon: React.ReactNode; bar: string }> = {
   pending: {
@@ -66,18 +73,22 @@ export default function Absence() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
-    requestType: "absence" as "absence" | "late",
+    requestType: "absence" as RequestType,
     targetDate: "",
     arrivalTime: "",
+    leaveTime: "",
     reason: "",
   });
 
   const handleSubmit = () => {
     if (!form.targetDate || !form.reason.trim()) { toast.error("日付と理由を入力してください"); return; }
+    if (form.requestType === "late" && !form.arrivalTime) { toast.error("到着予定時刻を入力してください"); return; }
+    if (form.requestType === "early_leave" && !form.leaveTime) { toast.error("早退予定時刻を入力してください"); return; }
     createMutation.mutate({
       requestType: form.requestType,
       targetDate: form.targetDate,
       arrivalTime: form.requestType === "late" ? form.arrivalTime : undefined,
+      leaveTime: form.requestType === "early_leave" ? form.leaveTime : undefined,
       reason: form.reason,
     });
   };
@@ -87,7 +98,7 @@ export default function Absence() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black flex items-center gap-2"><span>📝</span> 遅刻・欠席申請</h1>
+          <h1 className="text-3xl font-black flex items-center gap-2"><span>📝</span> 遅刻・欠席・早退申請</h1>
           <p className="text-sm text-muted-foreground mt-1 font-medium">申請はパートリーダー・先生の承認が必要です</p>
         </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2">
@@ -141,14 +152,17 @@ export default function Absence() {
                           {cfg.icon}
                           {cfg.label}
                         </span>
-                        <span className={`text-xs px-3 py-1 rounded-full border font-bold ${r.requestType === "absence" ? "bg-red-50 text-red-700 border-red-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
-                          {r.requestType === "absence" ? "🚫 欠席" : "⏰ 遅刻"}
+                        <span className={`text-xs px-3 py-1 rounded-full border font-bold ${requestTypeConfig[r.requestType as RequestType]?.color ?? requestTypeConfig.absence.color}`}>
+                          {requestTypeConfig[r.requestType as RequestType]?.label ?? "申請"}
                         </span>
                       </div>
                       <p className="text-sm font-medium">
                         {format(parseISO(r.targetDate), "yyyy年M月d日（E）", { locale: ja })}
                         {r.requestType === "late" && r.arrivalTime && (
                           <span className="text-muted-foreground font-normal ml-2">到着予定: {r.arrivalTime}</span>
+                        )}
+                        {r.requestType === "early_leave" && r.leaveTime && (
+                          <span className="text-muted-foreground font-normal ml-2">早退予定: {r.leaveTime}</span>
                         )}
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">{r.reason}</p>
@@ -193,16 +207,17 @@ export default function Absence() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-bold text-lg">📝 遅刻・欠席申請</DialogTitle>
+            <DialogTitle className="font-bold text-lg">📝 遅刻・欠席・早退申請</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>申請種別</Label>
-              <Select value={form.requestType} onValueChange={v => setForm(f => ({ ...f, requestType: v as any }))}>
+              <Select value={form.requestType} onValueChange={v => setForm(f => ({ ...f, requestType: v as RequestType }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="absence">欠席</SelectItem>
                   <SelectItem value="late">遅刻</SelectItem>
+                  <SelectItem value="early_leave">早退</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -216,12 +231,18 @@ export default function Absence() {
                 <Input type="time" value={form.arrivalTime} onChange={e => setForm(f => ({ ...f, arrivalTime: e.target.value }))} />
               </div>
             )}
+            {form.requestType === "early_leave" && (
+              <div className="space-y-1.5">
+                <Label>早退予定時刻</Label>
+                <Input type="time" value={form.leaveTime} onChange={e => setForm(f => ({ ...f, leaveTime: e.target.value }))} />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>理由</Label>
               <Textarea
                 value={form.reason}
                 onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-                placeholder="欠席・遅刻の理由を入力してください"
+                placeholder="欠席・遅刻・早退の理由を入力してください"
                 rows={3}
               />
             </div>

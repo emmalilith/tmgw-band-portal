@@ -24,6 +24,7 @@ type AbsenceRequest = {
   requestType: string;
   targetDate: string;
   arrivalTime?: string | null;
+  leaveTime?: string | null;
   reason: string;
   status: string;
   createdAt: Date;
@@ -32,6 +33,12 @@ type AbsenceRequest = {
   teacherApprovedAt?: Date | null;
   teacherComment?: string | null;
   requester?: { name?: string | null; email?: string | null } | null;
+};
+
+const requestTypeConfig: Record<string, { label: string; color: string }> = {
+  absence: { label: "🚫 欠席", color: "bg-red-50 text-red-700 border-red-200" },
+  late: { label: "⏰ 遅刻", color: "bg-orange-50 text-orange-700 border-orange-200" },
+  early_leave: { label: "🚪 早退", color: "bg-blue-50 text-blue-700 border-blue-200" },
 };
 
 export default function AdminApprovals() {
@@ -103,8 +110,8 @@ export default function AdminApprovals() {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {statusBadge(r.status)}
-              <span className={`text-xs px-3 py-1 rounded-full border font-bold ${r.requestType === "absence" ? "bg-red-50 text-red-700 border-red-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
-                {r.requestType === "absence" ? "🚫 欠席" : "⏰ 遅刻"}
+              <span className={`text-xs px-3 py-1 rounded-full border font-bold ${requestTypeConfig[r.requestType]?.color ?? "bg-gray-50 text-gray-700 border-gray-200"}`}>
+                {requestTypeConfig[r.requestType]?.label ?? r.requestType}
               </span>
             </div>
             <p className="font-bold text-sm">
@@ -114,6 +121,9 @@ export default function AdminApprovals() {
               {format(parseISO(r.targetDate), "yyyy年M月d日（E）", { locale: ja })}
               {r.requestType === "late" && r.arrivalTime && (
                 <span className="ml-2">到着予定: {r.arrivalTime}</span>
+              )}
+              {r.requestType === "early_leave" && r.leaveTime && (
+                <span className="ml-2">早退予定: {r.leaveTime}</span>
               )}
             </p>
             <p className="text-sm mt-1">{r.reason}</p>
@@ -162,7 +172,7 @@ export default function AdminApprovals() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-black flex items-center gap-2"><span>🛡️</span> 申請承認</h1>
-        <p className="text-sm text-muted-foreground mt-1 font-medium">遅刻・欠席申請の承認・却下を行います</p>
+        <p className="text-sm text-muted-foreground mt-1 font-medium">遅刻・欠席・早退申請の承認・却下を行います</p>
       </div>
 
       <Tabs defaultValue="pending">

@@ -221,7 +221,7 @@ export default function Login() {
                     アカウントを作成
                   </Button>
                   <p className="text-xs text-center text-gray-500">
-                    ※ 最初に登録したユーザーが管理者（顧問）になります
+                    ※ 管理者メールアドレスに指定されたユーザーが管理者（顧問）になります
                   </p>
                 </form>
               </TabsContent>

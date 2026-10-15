@@ -1,4 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./db")>();
+  return {
+    ...actual,
+    getAllUsers: vi.fn().mockResolvedValue([]),
+  };
+});
+
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -53,6 +62,7 @@ describe("auth.me", () => {
     const result = await caller.auth.me();
     expect(result?.name).toBe("顧問先生");
     expect(result?.role).toBe("admin");
+    expect(result).not.toHaveProperty("passwordHash");
   });
 
   it("returns null when not authenticated", async () => {
@@ -68,14 +78,11 @@ describe("auth.me", () => {
 });
 
 describe("RBAC - admin-only procedures", () => {
-  it("admin can call users.all", async () => {
+  it("admin can call users.list", async () => {
     const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
-    // Should not throw FORBIDDEN (DB may be unavailable in test env)
-    const result = await caller.users.all().catch((e: Error) => e);
-    if (result instanceof Error) {
-      expect(result.message).not.toContain("管理者権限");
-    }
+    const result = await caller.users.list();
+    expect(result).toEqual([]);
   });
 
   it("member cannot call users.updateRole", async () => {
@@ -112,8 +119,9 @@ describe("absence request workflow", () => {
     // DB may not be available in test env so we just check it doesn't throw FORBIDDEN
     await expect(
       caller.absence.create({
-        requestType: "absence",
+        requestType: "early_leave",
         targetDate: "2026-04-01",
+        leaveTime: "16:30",
         reason: "体調不良のため",
       })
     ).resolves.not.toThrow();

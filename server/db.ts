@@ -1,5 +1,7 @@
 import { and, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { createPool } from "mysql2/promise";
+import type { Pool } from "mysql2/promise";
 import {
   AbsenceRequest,
   Announcement,
@@ -24,12 +26,31 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+type Database = ReturnType<typeof drizzle<Record<string, never>, Pool>>;
+let _db: Database | null = null;
+
+function needsTls(databaseUrl: string) {
+  const hostname = new URL(databaseUrl).hostname;
+  return ENV.databaseSsl || hostname.endsWith("tidbcloud.com");
+}
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && ENV.databaseUrl) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const url = new URL(ENV.databaseUrl);
+      const pool = createPool({
+        host: url.hostname,
+        port: Number(url.port || 3306),
+        user: decodeURIComponent(url.username),
+        password: decodeURIComponent(url.password),
+        database: decodeURIComponent(url.pathname.replace(/^\//, "")),
+        waitForConnections: true,
+        connectionLimit: 5,
+        ssl: needsTls(ENV.databaseUrl)
+          ? { minVersion: "TLSv1.2", rejectUnauthorized: true }
+          : undefined,
+      });
+      _db = drizzle({ client: pool });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -333,6 +354,10 @@ export async function getEnsembleAttendanceByDate(date: string) {
     .limit(1);
 
   const practice = practiceRows[0] ?? null;
+
+  // Requests belong on the attendance board only when an ensemble practice is
+  // registered for the selected day.
+  if (!practice) return { practice: null, absences: [] };
 
   // Get all approved absence requests for that date (join with user info)
   const absenceRows = await db

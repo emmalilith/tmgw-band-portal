@@ -42,7 +42,9 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    // The client and API are served by the same Express origin in development
+    // and production. Lax works over local HTTP and protects against CSRF.
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }
