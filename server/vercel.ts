@@ -1,13 +1,13 @@
 import "dotenv/config";
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerLocalAuthRoutes } from "../server/_core/localAuth";
-import { appRouter } from "../server/routers";
-import { createContext } from "../server/_core/context";
+import { registerLocalAuthRoutes } from "./_core/localAuth";
+import { appRouter } from "./routers";
+import { createContext } from "./_core/context";
 
 /**
- * Vercel serverless API entry point. The frontend is hosted from /public, while
- * every /api/* request is rewritten here by vercel.json.
+ * Standalone application used to build Vercel's bundled serverless function.
+ * The frontend is served as static files, and all API routes are handled here.
  */
 const app = express();
 app.set("trust proxy", 1);
