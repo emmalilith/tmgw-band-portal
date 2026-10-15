@@ -13,6 +13,6 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: ADMIN_EMAIL
-        sync: false
+        value: "emmaly.isobe@gmail.com"
       - key: DATABASE_SSL
         value: "true"

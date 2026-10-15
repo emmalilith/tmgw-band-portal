@@ -69,6 +69,7 @@ export default function Home() {
   const { data: todayPractice } = trpc.practice.today.useQuery();
   const { data: announcements } = trpc.announcements.list.useQuery();
   const { data: upcomingLessons } = trpc.lessonVisits.upcoming.useQuery();
+  const { data: myAttendance } = trpc.attendance.mine.useQuery();
 
   const today = format(new Date(), "yyyy年M月d日（E）", { locale: ja });
   const recentAnnouncements = announcements?.slice(0, 5) ?? [];
@@ -172,6 +173,24 @@ export default function Home() {
           </Card>
         </div>
       </div>
+
+      {/* Personal attendance record */}
+      <Card className="border-0 shadow-md bg-white rounded-2xl overflow-hidden">
+        <CardContent className="p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-base font-black">📋 自分の出欠記録</p>
+            <p className="text-xs text-muted-foreground mt-1">先生の最終承認済みの記録です</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs font-black">欠席 {myAttendance?.absenceCount ?? 0}</span>
+            <span className="rounded-full bg-amber-50 text-amber-700 px-3 py-1.5 text-xs font-black">遅刻 {myAttendance?.lateCount ?? 0}</span>
+            <span className="rounded-full bg-sky-50 text-sky-700 px-3 py-1.5 text-xs font-black">早退 {myAttendance?.earlyLeaveCount ?? 0}</span>
+          </div>
+          {user?.role === "admin" && (
+            <button onClick={() => setLocation("/admin/organizer")} className="text-xs font-black text-violet-700 hover:underline">全員の記録を管理 →</button>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Second row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

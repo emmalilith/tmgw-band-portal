@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { format, addDays, subDays, parseISO, isSameDay } from "date-fns";
 import { ja } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock, MapPin, Music, Music2, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, Music, Music2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -56,6 +56,7 @@ export default function Practice() {
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     practiceDate: format(new Date(), "yyyy-MM-dd"),
     practiceType: "ensemble" as keyof typeof practiceTypeConfig,
@@ -70,17 +71,29 @@ export default function Practice() {
   const { data: practices, isLoading } = trpc.practice.byDate.useQuery({ date: dateStr });
 
   const createMutation = trpc.practice.create.useMutation({
-    onSuccess: () => { utils.practice.byDate.invalidate(); utils.practice.today.invalidate(); toast.success("練習予定を追加しました"); setDialogOpen(false); },
+    onSuccess: () => { utils.practice.byDate.invalidate(); utils.practice.today.invalidate(); utils.ensembleAttendance.invalidate(); toast.success("練習予定を追加しました"); setDialogOpen(false); },
     onError: () => toast.error("追加に失敗しました"),
   });
   const deleteMutation = trpc.practice.delete.useMutation({
-    onSuccess: () => { utils.practice.byDate.invalidate(); utils.practice.today.invalidate(); toast.success("削除しました"); },
+    onSuccess: () => { utils.practice.byDate.invalidate(); utils.practice.today.invalidate(); utils.ensembleAttendance.invalidate(); toast.success("削除しました"); },
     onError: () => toast.error("削除に失敗しました"),
+  });
+  const updateMutation = trpc.practice.update.useMutation({
+    onSuccess: () => {
+      utils.practice.byDate.invalidate();
+      utils.practice.today.invalidate();
+      utils.ensembleAttendance.invalidate();
+      toast.success("練習予定を更新しました");
+      setDialogOpen(false);
+      setEditingId(null);
+    },
+    onError: (error) => toast.error(error.message || "更新に失敗しました"),
   });
 
   const isToday = isSameDay(selectedDate, new Date());
 
   const openCreate = () => {
+    setEditingId(null);
     setForm({
       practiceDate: dateStr,
       practiceType: "ensemble",
@@ -93,8 +106,23 @@ export default function Practice() {
     setDialogOpen(true);
   };
 
+  const openEdit = (practice: NonNullable<typeof practices>[number]) => {
+    setEditingId(practice.id);
+    setForm({
+      practiceDate: practice.practiceDate,
+      practiceType: practice.practiceType as keyof typeof practiceTypeConfig,
+      repertoire: practice.repertoire ?? "",
+      startTime: practice.startTime ?? "",
+      endTime: practice.endTime ?? "",
+      location: practice.location ?? "",
+      notes: practice.notes ?? "",
+    });
+    setDialogOpen(true);
+  };
+
   const handleSubmit = () => {
-    createMutation.mutate(form);
+    if (editingId) updateMutation.mutate({ id: editingId, ...form });
+    else createMutation.mutate(form);
   };
 
   return (
@@ -174,12 +202,10 @@ export default function Practice() {
                       )}
                     </div>
                     {canManage && (
-                      <Button
-                        variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                        onClick={() => deleteMutation.mutate({ id: p.id })}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex shrink-0">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)} title="練習予定を編集"><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteMutation.mutate({ id: p.id })} title="練習予定を削除"><Trash2 className="w-4 h-4" /></Button>
+                      </div>
                     )}
                   </div>
                 </CardContent>
@@ -205,7 +231,7 @@ export default function Practice() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-bold text-lg">🎼 練習予定を追加</DialogTitle>
+            <DialogTitle className="font-bold text-lg">🎼 {editingId ? "練習予定を編集" : "練習予定を追加"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -255,7 +281,7 @@ export default function Practice() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>キャンセル</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending}>追加する</Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>{editingId ? "更新する" : "追加する"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -18,6 +18,10 @@ import {
   deleteSchedule,
   getAllAbsenceRequests,
   getAllUsers,
+  getAttendanceStatsForAllUsers,
+  getAttendanceStatsForUser,
+  getOrganizerCount,
+  getUserById,
   getAnnouncements,
   getEvents,
   getFeaturedEvent,
@@ -35,6 +39,7 @@ import {
   updatePracticeSchedule,
   updateSchedule,
   updateUserRole,
+  deleteUserAccount,
   createAbsenceRequest,
   getAbsenceRequestsByUser,
   getEnsembleAttendanceByDate,
@@ -82,7 +87,45 @@ export const appRouter = router({
           part: z.string().optional(),
         })
       )
-      .mutation(({ input }) => updateUserRole(input.userId, input.role, input.part)),
+      .mutation(async ({ input }) => {
+        const target = await getUserById(input.userId);
+        if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "アカウントが見つかりません" });
+        if (target.role === "admin" && input.role !== "admin" && (await getOrganizerCount()) <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "最後のorganizerを部員またはパートリーダーへ変更することはできません",
+          });
+        }
+        return updateUserRole(input.userId, input.role, input.part);
+      }),
+    remove: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.userId === ctx.user.id) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "自分自身のアカウントは削除できません。別のorganizerに依頼してください。",
+          });
+        }
+
+        const target = await getUserById(input.userId);
+        if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "アカウントが見つかりません" });
+        if (target.role === "admin" && (await getOrganizerCount()) <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "最後のorganizerアカウントは削除できません",
+          });
+        }
+
+        await deleteUserAccount(input.userId);
+        return { success: true } as const;
+      }),
+  }),
+
+  // ─── Attendance totals ──────────────────────────────────────────────────────
+  attendance: router({
+    mine: protectedProcedure.query(({ ctx }) => getAttendanceStatsForUser(ctx.user.id)),
+    all: adminProcedure.query(() => getAttendanceStatsForAllUsers()),
   }),
 
   // ─── Announcements ─────────────────────────────────────────────────────────

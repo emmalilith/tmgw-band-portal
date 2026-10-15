@@ -112,6 +112,88 @@ export async function updateUserRole(userId: number, role: "admin" | "section_le
   await db.update(users).set({ role, part: part ?? null }).where(eq(users.id, userId));
 }
 
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result[0];
+}
+
+export async function getOrganizerCount() {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(users)
+    .where(eq(users.role, "admin"));
+  return Number(result[0]?.count ?? 0);
+}
+
+/** Removes a former member's login and their absence records so no orphaned records remain. */
+export async function deleteUserAccount(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(absenceRequests).where(eq(absenceRequests.requesterId, userId));
+  await db.delete(users).where(eq(users.id, userId));
+}
+
+// ─── Attendance statistics ────────────────────────────────────────────────────
+const approvedStatus = sql`'teacher_approved'`;
+const absenceTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'absence' THEN 1 ELSE 0 END), 0)`;
+const lateTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'late' THEN 1 ELSE 0 END), 0)`;
+const earlyLeaveTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'early_leave' THEN 1 ELSE 0 END), 0)`;
+const attendanceTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} THEN 1 ELSE 0 END), 0)`;
+
+export async function getAttendanceStatsForUser(userId: number) {
+  const db = await getDb();
+  if (!db) return { absenceCount: 0, lateCount: 0, earlyLeaveCount: 0, totalCount: 0 };
+  const result = await db
+    .select({
+      absenceCount: absenceTotal,
+      lateCount: lateTotal,
+      earlyLeaveCount: earlyLeaveTotal,
+      totalCount: attendanceTotal,
+    })
+    .from(absenceRequests)
+    .where(eq(absenceRequests.requesterId, userId));
+  const stats = result[0];
+  return {
+    absenceCount: Number(stats?.absenceCount ?? 0),
+    lateCount: Number(stats?.lateCount ?? 0),
+    earlyLeaveCount: Number(stats?.earlyLeaveCount ?? 0),
+    totalCount: Number(stats?.totalCount ?? 0),
+  };
+}
+
+export async function getAttendanceStatsForAllUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      email: users.email,
+      part: users.part,
+      role: users.role,
+      absenceCount: absenceTotal,
+      lateCount: lateTotal,
+      earlyLeaveCount: earlyLeaveTotal,
+      totalCount: attendanceTotal,
+    })
+    .from(users)
+    .leftJoin(absenceRequests, eq(absenceRequests.requesterId, users.id))
+    .groupBy(users.id, users.name, users.email, users.part, users.role)
+    .orderBy(desc(attendanceTotal), users.name);
+
+  return result.map((stats) => ({
+    ...stats,
+    absenceCount: Number(stats.absenceCount ?? 0),
+    lateCount: Number(stats.lateCount ?? 0),
+    earlyLeaveCount: Number(stats.earlyLeaveCount ?? 0),
+    totalCount: Number(stats.totalCount ?? 0),
+  }));
+}
+
 // ─── Announcements ────────────────────────────────────────────────────────────
 export async function getAnnouncements() {
   const db = await getDb();

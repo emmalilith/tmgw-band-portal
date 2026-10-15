@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { ja } from "date-fns/locale";
+import { useLocation } from "wouter";
 
 const TYPE_CONFIG = {
   absence: {
@@ -87,13 +89,15 @@ function AttendanceMember({
 }
 
 export default function EnsembleAttendance() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [selectedDate, setSelectedDate] = useState<string>(
     () => new Date().toISOString().split("T")[0]
   );
 
   const yearMonth = useMemo(() => selectedDate.slice(0, 7), [selectedDate]);
 
-  const { data: attendanceData, isLoading } = trpc.ensembleAttendance.byDate.useQuery(
+  const { data: attendanceData, isLoading, isError, error } = trpc.ensembleAttendance.byDate.useQuery(
     { date: selectedDate },
     { enabled: !!selectedDate }
   );
@@ -261,13 +265,34 @@ export default function EnsembleAttendance() {
                 <p className="text-muted-foreground mt-3 text-sm">読み込み中...</p>
               </CardContent>
             </Card>
+          ) : isError ? (
+            <Card className="border-0 shadow-md border border-red-100">
+              <CardContent className="p-8 text-center">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                <p className="font-bold text-foreground">合奏出欠を読み込めませんでした</p>
+                <p className="text-sm text-muted-foreground mt-1">{error.message || "ページを再読み込みしてください"}</p>
+              </CardContent>
+            </Card>
+          ) : !practice ? (
+            <Card className="border-0 shadow-md">
+              <CardContent className="p-8 text-center">
+                <Music2 className="h-12 w-12 text-violet-500 mx-auto mb-3" />
+                <p className="font-bold text-foreground">この日に合奏が登録されていません</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  合奏出欠を表示するには、運営が「本日の練習」でこの日を合奏として登録します。
+                </p>
+                {user?.role === "admin" && (
+                  <Button className="mt-4" onClick={() => setLocation("/practice")}>合奏練習を登録する</Button>
+                )}
+              </CardContent>
+            </Card>
           ) : absences.length === 0 ? (
             <Card className="border-0 shadow-md">
               <CardContent className="p-8 text-center">
                 <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
                 <p className="font-bold text-foreground">全員出席予定！</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {practice ? "承認済みの欠席・遅刻・早退申請はありません" : "この日に合奏練習の登録または申請はありません"}
+                  承認済みの欠席・遅刻・早退申請はありません
                 </p>
               </CardContent>
             </Card>

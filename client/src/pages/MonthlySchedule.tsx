@@ -33,7 +33,7 @@ import {
   subMonths,
 } from "date-fns";
 import { ja } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -55,6 +55,7 @@ export default function MonthlySchedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -78,6 +79,16 @@ export default function MonthlySchedule() {
     onSuccess: () => { utils.schedules.byMonth.invalidate(); toast.success("削除しました"); },
     onError: () => toast.error("削除に失敗しました"),
   });
+  const updateMutation = trpc.schedules.update.useMutation({
+    onSuccess: () => {
+      utils.schedules.byMonth.invalidate();
+      utils.schedules.byWeek.invalidate();
+      toast.success("スケジュールを更新しました");
+      setDialogOpen(false);
+      setEditingId(null);
+    },
+    onError: (error) => toast.error(error.message || "更新に失敗しました"),
+  });
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -88,6 +99,7 @@ export default function MonthlySchedule() {
     schedules?.filter(s => isSameDay(parseISO(s.scheduleDate), day)) ?? [];
 
   const openCreate = (day: Date) => {
+    setEditingId(null);
     setForm({
       title: "",
       description: "",
@@ -100,9 +112,24 @@ export default function MonthlySchedule() {
     setDialogOpen(true);
   };
 
+  const openEdit = (schedule: NonNullable<typeof schedules>[number]) => {
+    setEditingId(schedule.id);
+    setForm({
+      title: schedule.title,
+      description: schedule.description ?? "",
+      scheduleDate: schedule.scheduleDate,
+      startTime: schedule.startTime ?? "",
+      endTime: schedule.endTime ?? "",
+      location: schedule.location ?? "",
+      type: schedule.type as keyof typeof typeConfig,
+    });
+    setDialogOpen(true);
+  };
+
   const handleSubmit = () => {
     if (!form.title.trim()) { toast.error("タイトルを入力してください"); return; }
-    createMutation.mutate(form);
+    if (editingId) updateMutation.mutate({ id: editingId, ...form });
+    else createMutation.mutate(form);
   };
 
   const selectedSchedules = selectedDay ? getSchedulesForDay(selectedDay) : [];
@@ -239,12 +266,14 @@ export default function MonthlySchedule() {
                           {s.location && <p className="text-xs text-muted-foreground">{s.location}</p>}
                         </div>
                         {canManage && (
-                          <Button
-                            variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
-                            onClick={() => deleteMutation.mutate({ id: s.id })}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                          <div className="flex shrink-0">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(s)} title="予定を編集">
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => deleteMutation.mutate({ id: s.id })} title="予定を削除">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -269,7 +298,7 @@ export default function MonthlySchedule() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-bold text-lg">🗓️ スケジュールを追加</DialogTitle>
+            <DialogTitle className="font-bold text-lg">🗓️ {editingId ? "スケジュールを編集" : "スケジュールを追加"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -314,7 +343,7 @@ export default function MonthlySchedule() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>キャンセル</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending}>追加する</Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>{editingId ? "更新する" : "追加する"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

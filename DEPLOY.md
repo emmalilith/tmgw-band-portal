@@ -13,7 +13,7 @@ It does not contain `manus`, and no custom domain purchase is required.
 ## Before starting
 
 1. Push the latest project files to the GitHub repository. Make sure `render.yaml` and this file are included.
-2. Decide which email address will be the teacher/admin account. Use exactly that address for `ADMIN_EMAIL` and the first registration.
+2. The first organizer is preconfigured as **emmaly.isobe@gmail.com**. Register that exact address first; after publishing, any organizer can add or remove other organizers in **メンバー・organizer管理**.
 
 ## Part 1 — Create the free database at TiDB Cloud
 
@@ -38,7 +38,7 @@ Keep that URL private. It is the value for `DATABASE_URL` in Render.
 | Render field | Enter this value |
 |---|---|
 | `DATABASE_URL` | The complete TiDB connection URL copied in Part 1 |
-| `ADMIN_EMAIL` | The email for the teacher/admin, for example `teacher@school.edu` |
+| `ADMIN_EMAIL` | Already prefilled as `emmaly.isobe@gmail.com` — leave it unchanged unless you deliberately want a different first organizer |
 
 Render creates the long `JWT_SECRET` securely by itself. Do not change it.
 
@@ -49,8 +49,8 @@ Render creates the long `JWT_SECRET` securely by itself. Do not change it.
 
 1. Open the new `.onrender.com` address.
 2. Select **新規登録**.
-3. Register with the **same email address entered as `ADMIN_EMAIL`**.
-4. This account becomes **顧問 (admin)**. From **メンバー管理**, promote selected students to **パートリーダー** and leave the others as **部員**.
+3. Register with **emmaly.isobe@gmail.com**.
+4. This account becomes the first **Organizer**. From **メンバー・organizer管理**, promote or remove organizers, set part leaders, and remove former member accounts.
 
 ## Updating the site later
 
@@ -63,7 +63,7 @@ Edit the project, commit, and push to the GitHub branch connected to Render. Ren
 | A deployment fails before the site appears | Open the Render service → **Events** or **Logs** and check the first error. Confirm `DATABASE_URL` is the complete TiDB URL. |
 | The first page takes a long time | This is normal after 15 minutes of inactivity on Render's Free service. Wait up to one minute, then refresh. |
 | `Access denied` or TLS connection error | In TiDB Cloud, reopen **Connect**, confirm the public endpoint/firewall is enabled, then copy the application connection URL again. |
-| The registered account is not an administrator | Confirm the account email exactly matches `ADMIN_EMAIL`, including spelling. Update the Render environment variable and redeploy if necessary. |
+| The registered account is not an organizer | Confirm the account email exactly matches `ADMIN_EMAIL`, including spelling. Update the Render environment variable and redeploy if necessary. |
 | A migration fails | Confirm `DATABASE_URL` points to TiDB Cloud and that `DATABASE_SSL=true` appears in Render's environment list. Do not remove `preDeployCommand` from `render.yaml`. |
 
 ## Platform notes

@@ -37,6 +37,7 @@ import {
   Music2,
   PanelLeft,
   Settings,
+  ShieldCheck,
   Sparkles,
   Star,
   UserCheck,
@@ -60,6 +61,7 @@ const mainMenuItems = [
 ];
 
 const adminMenuItems = [
+  { icon: ShieldCheck, label: "運営ダッシュボード", path: "/admin/organizer", emoji: "🛠️" },
   { icon: Users, label: "メンバー管理", path: "/admin/users", emoji: "👥" },
   { icon: Settings, label: "申請承認", path: "/admin/approvals", emoji: "✅" },
 ];
@@ -70,7 +72,7 @@ const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 
 function getRoleLabel(role?: string) {
-  if (role === "admin") return "顧問";
+  if (role === "admin") return "Organizer";
   if (role === "section_leader") return "パートリーダー";
   return "部員";
 }
@@ -248,12 +250,12 @@ function DashboardLayoutContent({
               <SidebarGroup className="mt-3">
                 {!isCollapsed && (
                   <SidebarGroupLabel className="text-xs text-white/40 uppercase tracking-widest px-4 mb-1 font-bold">
-                    管理
+                  運営管理
                   </SidebarGroupLabel>
                 )}
                 <SidebarMenu className="px-2 gap-0.5">
                   {adminMenuItems.map(item => {
-                    if (item.path === "/admin/users" && !isAdmin) return null;
+                    if ((item.path === "/admin/users" || item.path === "/admin/organizer") && !isAdmin) return null;
                     const isActive = location === item.path;
                     return (
                       <SidebarMenuItem key={item.path}>

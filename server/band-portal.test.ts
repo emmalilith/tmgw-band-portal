@@ -5,6 +5,25 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     getAllUsers: vi.fn().mockResolvedValue([]),
+    getAttendanceStatsForUser: vi.fn().mockResolvedValue({
+      absenceCount: 2,
+      lateCount: 1,
+      earlyLeaveCount: 0,
+      totalCount: 3,
+    }),
+    getAttendanceStatsForAllUsers: vi.fn().mockResolvedValue([
+      {
+        userId: 2,
+        name: "部員A",
+        email: "member@example.com",
+        part: "Flute",
+        role: "member",
+        absenceCount: 2,
+        lateCount: 1,
+        earlyLeaveCount: 0,
+        totalCount: 3,
+      },
+    ]),
   };
 });
 
@@ -57,8 +76,7 @@ function createMemberContext(): TrpcContext {
 
 describe("auth.me", () => {
   it("returns the current user when authenticated", async () => {
-    const ctx = createAdminContext();
-    const caller = appRouter.createCaller(ctx);
+    const caller = appRouter.createCaller(createAdminContext());
     const result = await caller.auth.me();
     expect(result?.name).toBe("顧問先生");
     expect(result?.role).toBe("admin");
@@ -71,31 +89,47 @@ describe("auth.me", () => {
       req: { protocol: "https", headers: {} } as TrpcContext["req"],
       res: { clearCookie: () => {} } as unknown as TrpcContext["res"],
     };
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.auth.me();
+    const result = await appRouter.createCaller(ctx).auth.me();
     expect(result).toBeNull();
   });
 });
 
-describe("RBAC - admin-only procedures", () => {
-  it("admin can call users.list", async () => {
-    const ctx = createAdminContext();
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.users.list();
+describe("RBAC - organizer-only procedures", () => {
+  it("organizer can list members", async () => {
+    const result = await appRouter.createCaller(createAdminContext()).users.list();
     expect(result).toEqual([]);
   });
 
-  it("member cannot call users.updateRole", async () => {
-    const ctx = createMemberContext();
-    const caller = appRouter.createCaller(ctx);
+  it("member cannot change organizer roles", async () => {
+    const caller = appRouter.createCaller(createMemberContext());
     await expect(caller.users.updateRole({ userId: 1, role: "admin" })).rejects.toThrow();
+  });
+
+  it("member cannot remove an account", async () => {
+    const caller = appRouter.createCaller(createMemberContext());
+    await expect(caller.users.remove({ userId: 1 })).rejects.toThrow();
+  });
+});
+
+describe("attendance statistics", () => {
+  it("members can see only their own approved attendance totals", async () => {
+    const result = await appRouter.createCaller(createMemberContext()).attendance.mine();
+    expect(result).toMatchObject({ absenceCount: 2, lateCount: 1, totalCount: 3 });
+  });
+
+  it("organizers can view club-wide attendance totals", async () => {
+    const result = await appRouter.createCaller(createAdminContext()).attendance.all();
+    expect(result).toHaveLength(1);
+  });
+
+  it("members cannot view club-wide attendance totals", async () => {
+    await expect(appRouter.createCaller(createMemberContext()).attendance.all()).rejects.toThrow();
   });
 });
 
 describe("ensembleAttendance", () => {
   it("member can query ensemble attendance by date", async () => {
-    const ctx = createMemberContext();
-    const caller = appRouter.createCaller(ctx);
+    const caller = appRouter.createCaller(createMemberContext());
     const result = await caller.ensembleAttendance.byDate({ date: "2025-04-10" }).catch(() => null);
     if (result !== null) {
       expect(result).toHaveProperty("practice");
@@ -104,19 +138,15 @@ describe("ensembleAttendance", () => {
   });
 
   it("member can query ensemble dates in month", async () => {
-    const ctx = createMemberContext();
-    const caller = appRouter.createCaller(ctx);
+    const caller = appRouter.createCaller(createMemberContext());
     const result = await caller.ensembleAttendance.datesInMonth({ yearMonth: "2025-04" }).catch(() => []);
     expect(Array.isArray(result)).toBe(true);
   });
 });
 
 describe("absence request workflow", () => {
-  it("member can create absence request (procedure is accessible)", async () => {
-    const ctx = createMemberContext();
-    const caller = appRouter.createCaller(ctx);
-    // The procedure should be accessible to members (no FORBIDDEN error)
-    // DB may not be available in test env so we just check it doesn't throw FORBIDDEN
+  it("member can create an early-leave request", async () => {
+    const caller = appRouter.createCaller(createMemberContext());
     await expect(
       caller.absence.create({
         requestType: "early_leave",
@@ -128,10 +158,7 @@ describe("absence request workflow", () => {
   });
 
   it("member cannot approve section requests", async () => {
-    const ctx = createMemberContext();
-    const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.absence.sectionApprove({ id: 999, approved: true })
-    ).rejects.toThrow();
+    const caller = appRouter.createCaller(createMemberContext());
+    await expect(caller.absence.sectionApprove({ id: 999, approved: true })).rejects.toThrow();
   });
 });
