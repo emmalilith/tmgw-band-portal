@@ -1,74 +1,57 @@
-# Publish TMGW Brass Band Portal without a Manus address
+# TMGW Brass Band Portal — Live free hosting
 
-This project is ready for **Render + TiDB Cloud Starter**. The result is a free public address such as:
+The portal is published at:
+
+> **https://tmgw-band-portal-7jf6.vercel.app**
+
+This is a free Vercel address and does **not** contain `manus`. No domain purchase is required.
+
+## First organizer account
+
+The organizer account is configured as:
 
 ```text
-https://tmgw-brass-band-portal.onrender.com
+emmaly.isobe@gmail.com
 ```
 
-It does not contain `manus`, and no custom domain purchase is required.
+It is already an **Organizer** account. Sign in using its existing portal password. If that account ever needs to be recovered, an existing organizer can manage other accounts through **Member & organizer management**.
 
-> Render's Free web service sleeps after 15 minutes without visitors. The first visit after that can take about a minute to open. It is suitable for a school club or demonstration site, but not for a high-availability public service.
+## What organizers can manage
 
-## Before starting
+From the organizer dashboard and the member-management screen, organizers can:
 
-1. Push the latest project files to the GitHub repository. Make sure `render.yaml` and this file are included.
-2. The first organizer is preconfigured as **emmaly.isobe@gmail.com**. Register that exact address first; after publishing, any organizer can add or remove other organizers in **メンバー・organizer管理**.
+- enter, edit, and remove the **monthly schedule**;
+- update the **today’s practice** plan, including ensemble repertoire and times;
+- view the weekly schedule automatically derived from monthly entries;
+- review each member’s approved **absence, lateness, and early-leave counts**;
+- promote or remove organizers and section leaders; and
+- remove former members’ accounts and their linked absence records.
 
-## Part 1 — Create the free database at TiDB Cloud
+## Updating the live site
 
-1. Open [TiDB Cloud](https://tidbcloud.com/) and create an account.
-2. Select **Create** and choose **TiDB Cloud Starter**. This tier has a no-cost quota and no credit card is required to start.
-3. Give the instance a name such as `tmgw-brass-db`, then finish creating it.
-4. Open the new instance and click **Connect** in the upper-right corner.
-5. Leave the connection type set to **Public**. If TiDB asks for firewall rules, allow `0.0.0.0/0` so Render can reach the database. TiDB encrypts this connection with TLS.
-6. Click **Generate Password** and save the password somewhere private. TiDB does not show it again.
-7. In the **Connect** dialog, choose the MySQL application connection string and copy the complete URL that begins with `mysql://`.
+1. Make changes on the `main` branch of the connected GitHub repository.
+2. Push the changes to GitHub.
+3. Vercel automatically creates a new production deployment.
 
-Keep that URL private. It is the value for `DATABASE_URL` in Render.
+The generated Vercel address remains the same.
 
-## Part 2 — Publish the website at Render
+## Important Vercel settings
 
-1. Go to [Render](https://dashboard.render.com/) and create an account. GitHub sign-in is fine.
-2. On the dashboard, select **New** → **Blueprint**.
-3. Connect GitHub if Render asks, then select the band portal repository.
-4. Render finds `render.yaml` automatically. Select **Apply**.
-5. On the setup page, fill in these two required values:
+The project is named `tmgw-band-portal-7jf6` in Vercel. Its production settings include:
 
-| Render field | Enter this value |
+| Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | The complete TiDB connection URL copied in Part 1 |
-| `ADMIN_EMAIL` | Already prefilled as `emmaly.isobe@gmail.com` — leave it unchanged unless you deliberately want a different first organizer |
+| `DATABASE_URL` | Secure database connection |
+| `JWT_SECRET` | Encrypts sign-in sessions |
+| `ADMIN_EMAIL` | Initial organizer email (`emmaly.isobe@gmail.com`) |
 
-Render creates the long `JWT_SECRET` securely by itself. Do not change it.
+Keep these values private. Any change to them should be followed by **Redeploy** in Vercel.
 
-6. Select **Apply** or **Create New Resources**. Render builds the project, applies the database migrations, and starts the website.
-7. When the service status becomes **Live**, select the service name. The public address is displayed at the top and ends in `.onrender.com`.
+## Troubleshooting
 
-## Part 3 — Create the first administrator account
-
-1. Open the new `.onrender.com` address.
-2. Select **新規登録**.
-3. Register with **emmaly.isobe@gmail.com**.
-4. This account becomes the first **Organizer**. From **メンバー・organizer管理**, promote or remove organizers, set part leaders, and remove former member accounts.
-
-## Updating the site later
-
-Edit the project, commit, and push to the GitHub branch connected to Render. Render automatically redeploys it. The TiDB database and member accounts remain in place.
-
-## If something goes wrong
-
-| What appears | What to do |
+| Issue | Action |
 |---|---|
-| A deployment fails before the site appears | Open the Render service → **Events** or **Logs** and check the first error. Confirm `DATABASE_URL` is the complete TiDB URL. |
-| The first page takes a long time | This is normal after 15 minutes of inactivity on Render's Free service. Wait up to one minute, then refresh. |
-| `Access denied` or TLS connection error | In TiDB Cloud, reopen **Connect**, confirm the public endpoint/firewall is enabled, then copy the application connection URL again. |
-| The registered account is not an organizer | Confirm the account email exactly matches `ADMIN_EMAIL`, including spelling. Update the Render environment variable and redeploy if necessary. |
-| A migration fails | Confirm `DATABASE_URL` points to TiDB Cloud and that `DATABASE_SSL=true` appears in Render's environment list. Do not remove `preDeployCommand` from `render.yaml`. |
-
-## Platform notes
-
-- **Render** provides a generated `onrender.com` address. A custom domain is optional, not required.
-- **TiDB Cloud Starter** is MySQL-compatible and has a free monthly quota. When its quota is reached, new database connections pause until the next month or a paid plan is selected.
-- **Railway** can also host this app, but its free access is a 30-day trial and then has a $1/month minimum. It is therefore not the no-cost recommendation.
-- If `ADMIN_EMAIL` is left blank, the first registered account becomes the administrator as a fallback. Setting it is safer because it avoids an accidental first registration becoming an admin.
+| The site does not show the newest version | Open Vercel → project → **Deployments**, then wait for the deployment of the latest `main` commit to be **Ready**. |
+| Login does not work | Open Vercel → project → **Environment Variables** and confirm `DATABASE_URL` and `JWT_SECRET` are present for **Production**, then redeploy. |
+| An organizer cannot see management pages | In **Member & organizer management**, promote the account to Organizer using an existing organizer account. |
+| The ensemble attendance board is empty | First register an **ensemble** practice for that date. Approved absence, late, and early-leave requests then appear beneath it. |
