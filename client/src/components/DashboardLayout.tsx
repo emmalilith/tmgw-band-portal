@@ -28,6 +28,7 @@ import {
   Bell,
   BookOpen,
   Calendar,
+  CalendarCheck,
   CalendarDays,
   CalendarRange,
   ChevronDown,
@@ -62,6 +63,7 @@ const mainMenuItems = [
 
 const adminMenuItems = [
   { icon: ShieldCheck, label: "運営ダッシュボード", path: "/admin/organizer", emoji: "🛠️" },
+  { icon: CalendarCheck, label: "出欠管理", path: "/admin/attendance", emoji: "📊" },
   { icon: Users, label: "メンバー管理", path: "/admin/users", emoji: "👥" },
   { icon: Settings, label: "申請承認", path: "/admin/approvals", emoji: "✅" },
 ];
@@ -255,7 +257,7 @@ function DashboardLayoutContent({
                 )}
                 <SidebarMenu className="px-2 gap-0.5">
                   {adminMenuItems.map(item => {
-                    if ((item.path === "/admin/users" || item.path === "/admin/organizer") && !isManagement) return null;
+                    if ((item.path === "/admin/users" || item.path === "/admin/organizer" || item.path === "/admin/attendance") && !isManagement) return null;
                     const isActive = location === item.path;
                     return (
                       <SidebarMenuItem key={item.path}>

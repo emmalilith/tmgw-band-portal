@@ -39,6 +39,8 @@ vi.mock("./db", async (importOriginal) => {
         totalCount: 3,
       },
     ]),
+    getAvailabilityByMonth: vi.fn().mockResolvedValue([]),
+    createManualAttendanceRecord: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -184,6 +186,19 @@ describe("attendance statistics", () => {
   it("members cannot view club-wide attendance totals", async () => {
     await expect(appRouter.createCaller(createMemberContext()).attendance.all()).rejects.toThrow();
   });
+
+  it("organizers can view the monthly availability calendar", async () => {
+    await expect(
+      appRouter.createCaller(createAdminContext()).attendance.availabilityByMonth({ year: 2026, month: 10 })
+    ).resolves.toEqual([]);
+    expect(db.getAvailabilityByMonth).toHaveBeenCalledWith(2026, 10);
+  });
+
+  it("members cannot view detailed availability planning data", async () => {
+    await expect(
+      appRouter.createCaller(createMemberContext()).attendance.availabilityByMonth({ year: 2026, month: 10 })
+    ).rejects.toThrow();
+  });
 });
 
 describe("reviewed schedule imports", () => {
@@ -227,6 +242,45 @@ describe("ensembleAttendance", () => {
 });
 
 describe("absence request workflow", () => {
+  it("organizer can add an immediately confirmed unexcused absence for a member", async () => {
+    await expect(
+      appRouter.createCaller(createAdminContext()).absence.createManual({
+        requesterId: 2,
+        requestType: "unexcused",
+        targetDate: "2026-10-20",
+        reason: "連絡なし",
+      })
+    ).resolves.not.toThrow();
+    expect(db.createManualAttendanceRecord).toHaveBeenCalledWith(expect.objectContaining({
+      requesterId: 2,
+      requestType: "unexcused",
+      targetDate: "2026-10-20",
+      recordedById: 1,
+    }));
+  });
+
+  it("member cannot enter attendance records for another member", async () => {
+    await expect(
+      appRouter.createCaller(createMemberContext()).absence.createManual({
+        requesterId: 1,
+        requestType: "absence",
+        targetDate: "2026-10-20",
+        reason: "テスト",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("requires an arrival time for an organizer-entered late record", async () => {
+    await expect(
+      appRouter.createCaller(createAdminContext()).absence.createManual({
+        requesterId: 2,
+        requestType: "late",
+        targetDate: "2026-10-20",
+        reason: "テスト",
+      })
+    ).rejects.toThrow("到着予定時刻");
+  });
+
   it("member can create an early-leave request", async () => {
     const caller = appRouter.createCaller(createMemberContext());
     await expect(

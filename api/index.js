@@ -120,8 +120,8 @@ var practiceSchedules = mysqlTable("practice_schedules", {
 var absenceRequests = mysqlTable("absence_requests", {
   id: int("id").autoincrement().primaryKey(),
   requesterId: int("requesterId").notNull(),
-  /** absence | late | early_leave */
-  requestType: mysqlEnum("requestType", ["absence", "late", "early_leave"]).notNull(),
+  /** absence | late | early_leave | unexcused */
+  requestType: mysqlEnum("requestType", ["absence", "late", "early_leave", "unexcused"]).notNull(),
   targetDate: varchar("targetDate", { length: 10 }).notNull(),
   /** 遅刻の場合の到着予定時刻 */
   arrivalTime: varchar("arrivalTime", { length: 8 }),
@@ -142,6 +142,10 @@ var absenceRequests = mysqlTable("absence_requests", {
   teacherApproverId: int("teacherApproverId"),
   teacherApprovedAt: timestamp("teacherApprovedAt"),
   teacherComment: text("teacherComment"),
+  /** True when a president/teacher logs an attendance issue on a member's behalf. */
+  isManualRecord: boolean("isManualRecord").default(false).notNull(),
+  /** The management account that entered a manual record, if applicable. */
+  recordedById: int("recordedById"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
@@ -263,17 +267,19 @@ async function deleteUserAccount(userId) {
   await db.delete(users).where(eq(users.id, userId));
 }
 var approvedStatus = sql`'teacher_approved'`;
-var absenceTotal = sql`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'absence' THEN 1 ELSE 0 END), 0)`;
+var absenceTotal = sql`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} IN ('absence', 'unexcused') THEN 1 ELSE 0 END), 0)`;
 var lateTotal = sql`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'late' THEN 1 ELSE 0 END), 0)`;
 var earlyLeaveTotal = sql`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'early_leave' THEN 1 ELSE 0 END), 0)`;
+var unexcusedTotal = sql`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'unexcused' THEN 1 ELSE 0 END), 0)`;
 var attendanceTotal = sql`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} THEN 1 ELSE 0 END), 0)`;
 async function getAttendanceStatsForUser(userId) {
   const db = await getDb();
-  if (!db) return { absenceCount: 0, lateCount: 0, earlyLeaveCount: 0, totalCount: 0 };
+  if (!db) return { absenceCount: 0, lateCount: 0, earlyLeaveCount: 0, unexcusedCount: 0, totalCount: 0 };
   const result = await db.select({
     absenceCount: absenceTotal,
     lateCount: lateTotal,
     earlyLeaveCount: earlyLeaveTotal,
+    unexcusedCount: unexcusedTotal,
     totalCount: attendanceTotal
   }).from(absenceRequests).where(eq(absenceRequests.requesterId, userId));
   const stats = result[0];
@@ -281,6 +287,7 @@ async function getAttendanceStatsForUser(userId) {
     absenceCount: Number(stats?.absenceCount ?? 0),
     lateCount: Number(stats?.lateCount ?? 0),
     earlyLeaveCount: Number(stats?.earlyLeaveCount ?? 0),
+    unexcusedCount: Number(stats?.unexcusedCount ?? 0),
     totalCount: Number(stats?.totalCount ?? 0)
   };
 }
@@ -296,6 +303,7 @@ async function getAttendanceStatsForAllUsers() {
     absenceCount: absenceTotal,
     lateCount: lateTotal,
     earlyLeaveCount: earlyLeaveTotal,
+    unexcusedCount: unexcusedTotal,
     totalCount: attendanceTotal
   }).from(users).leftJoin(absenceRequests, eq(absenceRequests.requesterId, users.id)).groupBy(users.id, users.name, users.email, users.part, users.role).orderBy(desc(attendanceTotal), users.name);
   return result.map((stats) => ({
@@ -303,6 +311,7 @@ async function getAttendanceStatsForAllUsers() {
     absenceCount: Number(stats.absenceCount ?? 0),
     lateCount: Number(stats.lateCount ?? 0),
     earlyLeaveCount: Number(stats.earlyLeaveCount ?? 0),
+    unexcusedCount: Number(stats.unexcusedCount ?? 0),
     totalCount: Number(stats.totalCount ?? 0)
   }));
 }
@@ -461,6 +470,8 @@ var absenceRequestWithMemberFields = {
   teacherApproverId: absenceRequests.teacherApproverId,
   teacherApprovedAt: absenceRequests.teacherApprovedAt,
   teacherComment: absenceRequests.teacherComment,
+  isManualRecord: absenceRequests.isManualRecord,
+  recordedById: absenceRequests.recordedById,
   createdAt: absenceRequests.createdAt,
   updatedAt: absenceRequests.updatedAt,
   requesterName: users.name,
@@ -500,6 +511,59 @@ async function createAbsenceRequest(data) {
   if (!db) throw new Error("DB not available");
   await db.insert(absenceRequests).values(data);
 }
+async function createManualAttendanceRecord(data) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(absenceRequests).values({
+    ...data,
+    status: "teacher_approved",
+    isManualRecord: true
+  });
+}
+async function getAvailabilityByMonth(year, month) {
+  const db = await getDb();
+  if (!db) return [];
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endExclusive = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const records = await db.select({
+    id: absenceRequests.id,
+    requesterId: absenceRequests.requesterId,
+    requestType: absenceRequests.requestType,
+    targetDate: absenceRequests.targetDate,
+    arrivalTime: absenceRequests.arrivalTime,
+    leaveTime: absenceRequests.leaveTime,
+    reason: absenceRequests.reason,
+    status: absenceRequests.status,
+    isManualRecord: absenceRequests.isManualRecord,
+    recordedById: absenceRequests.recordedById,
+    requesterName: users.name,
+    requesterPart: users.part
+  }).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(and(
+    or(
+      eq(absenceRequests.status, "pending"),
+      eq(absenceRequests.status, "section_approved"),
+      eq(absenceRequests.status, "president_approved"),
+      eq(absenceRequests.status, "teacher_approved")
+    ),
+    sql`${absenceRequests.targetDate} >= ${start}`,
+    sql`${absenceRequests.targetDate} < ${endExclusive}`
+  )).orderBy(absenceRequests.targetDate, absenceRequests.requestType, users.part, users.name);
+  const grouped = /* @__PURE__ */ new Map();
+  for (const record of records) {
+    const current = grouped.get(record.targetDate) ?? [];
+    current.push(record);
+    grouped.set(record.targetDate, current);
+  }
+  return Array.from(grouped, ([date, dayRecords]) => ({
+    date,
+    unavailableCount: new Set(dayRecords.map((record) => record.requesterId)).size,
+    absenceCount: dayRecords.filter((record) => record.requestType === "absence" || record.requestType === "unexcused").length,
+    unexcusedCount: dayRecords.filter((record) => record.requestType === "unexcused").length,
+    lateCount: dayRecords.filter((record) => record.requestType === "late").length,
+    earlyLeaveCount: dayRecords.filter((record) => record.requestType === "early_leave").length,
+    records: dayRecords
+  }));
+}
 async function updateAbsenceRequest(id, data) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -524,6 +588,7 @@ async function getEnsembleAttendanceByDate(date) {
     leaveTime: absenceRequests.leaveTime,
     reason: absenceRequests.reason,
     status: absenceRequests.status,
+    isManualRecord: absenceRequests.isManualRecord,
     createdAt: absenceRequests.createdAt,
     requesterName: users.name,
     requesterPart: users.part,
@@ -984,7 +1049,8 @@ var appRouter = router({
   // ─── Attendance totals ──────────────────────────────────────────────────────
   attendance: router({
     mine: protectedProcedure.query(({ ctx }) => getAttendanceStatsForUser(ctx.user.id)),
-    all: adminProcedure2.query(() => getAttendanceStatsForAllUsers())
+    all: adminProcedure2.query(() => getAttendanceStatsForAllUsers()),
+    availabilityByMonth: managementProcedure.input(z2.object({ year: z2.number().int().min(2020).max(2100), month: z2.number().int().min(1).max(12) })).query(({ input }) => getAvailabilityByMonth(input.year, input.month))
   }),
   // ─── Announcements ─────────────────────────────────────────────────────────
   announcements: router({
@@ -1212,6 +1278,35 @@ var appRouter = router({
       return createAbsenceRequest({
         ...input,
         requesterId: ctx.user.id
+      });
+    }),
+    /** Management can record an already-confirmed attendance issue for a member. */
+    createManual: managementProcedure.input(
+      z2.object({
+        requesterId: z2.number().int().positive(),
+        requestType: z2.enum(["absence", "late", "early_leave", "unexcused"]),
+        targetDate: z2.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        arrivalTime: z2.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+        leaveTime: z2.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+        reason: z2.string().trim().min(1).max(2e3)
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const member = await getUserById(input.requesterId);
+      if (!member) throw new TRPCError3({ code: "NOT_FOUND", message: "\u90E8\u54E1\u30A2\u30AB\u30A6\u30F3\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
+      if (input.requestType === "late" && !input.arrivalTime) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u9045\u523B\u306F\u5230\u7740\u4E88\u5B9A\u6642\u523B\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044" });
+      }
+      if (input.requestType === "early_leave" && !input.leaveTime) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u65E9\u9000\u306F\u9000\u51FA\u4E88\u5B9A\u6642\u523B\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044" });
+      }
+      return createManualAttendanceRecord({
+        requesterId: input.requesterId,
+        requestType: input.requestType,
+        targetDate: input.targetDate,
+        arrivalTime: input.requestType === "late" ? input.arrivalTime ?? null : null,
+        leaveTime: input.requestType === "early_leave" ? input.leaveTime ?? null : null,
+        reason: input.reason.trim(),
+        recordedById: ctx.user.id
       });
     }),
     /** The submitter's own part leader performs the first approval/rejection. */

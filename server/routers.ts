@@ -22,6 +22,7 @@ import {
   getAllUsers,
   getAttendanceStatsForAllUsers,
   getAttendanceStatsForUser,
+  getAvailabilityByMonth,
   getOrganizerCount,
   getUserById,
   getAnnouncements,
@@ -48,6 +49,7 @@ import {
   updateUserResponsibilities,
   deleteUserAccount,
   createAbsenceRequest,
+  createManualAttendanceRecord,
   getAbsenceRequestsByUser,
   getEnsembleAttendanceByDate,
   getEnsembleDatesWithAbsences,
@@ -245,6 +247,9 @@ export const appRouter = router({
   attendance: router({
     mine: protectedProcedure.query(({ ctx }) => getAttendanceStatsForUser(ctx.user.id)),
     all: adminProcedure.query(() => getAttendanceStatsForAllUsers()),
+    availabilityByMonth: managementProcedure
+      .input(z.object({ year: z.number().int().min(2020).max(2100), month: z.number().int().min(1).max(12) }))
+      .query(({ input }) => getAvailabilityByMonth(input.year, input.month)),
   }),
 
   // ─── Announcements ─────────────────────────────────────────────────────────
@@ -526,6 +531,37 @@ export const appRouter = router({
         return createAbsenceRequest({
           ...input,
           requesterId: ctx.user.id,
+        });
+      }),
+    /** Management can record an already-confirmed attendance issue for a member. */
+    createManual: managementProcedure
+      .input(
+        z.object({
+          requesterId: z.number().int().positive(),
+          requestType: z.enum(["absence", "late", "early_leave", "unexcused"]),
+          targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          arrivalTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+          leaveTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+          reason: z.string().trim().min(1).max(2000),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const member = await getUserById(input.requesterId);
+        if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "部員アカウントが見つかりません" });
+        if (input.requestType === "late" && !input.arrivalTime) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "遅刻は到着予定時刻を入力してください" });
+        }
+        if (input.requestType === "early_leave" && !input.leaveTime) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "早退は退出予定時刻を入力してください" });
+        }
+        return createManualAttendanceRecord({
+          requesterId: input.requesterId,
+          requestType: input.requestType,
+          targetDate: input.targetDate,
+          arrivalTime: input.requestType === "late" ? input.arrivalTime ?? null : null,
+          leaveTime: input.requestType === "early_leave" ? input.leaveTime ?? null : null,
+          reason: input.reason.trim(),
+          recordedById: ctx.user.id,
         });
       }),
     /** The submitter's own part leader performs the first approval/rejection. */

@@ -26,10 +26,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 type AbsenceStatus = "pending" | "section_approved" | "president_approved" | "teacher_approved" | "rejected";
-type RequestType = "absence" | "late" | "early_leave";
+type RequestType = "absence" | "late" | "early_leave" | "unexcused";
+type MemberRequestType = Exclude<RequestType, "unexcused">;
 
 const requestTypeConfig: Record<RequestType, { label: string; color: string }> = {
   absence: { label: "🚫 欠席", color: "bg-red-50 text-red-700 border-red-200" },
+  unexcused: { label: "⚠️ 無断欠席", color: "bg-rose-100 text-rose-800 border-rose-200" },
   late: { label: "⏰ 遅刻", color: "bg-orange-50 text-orange-700 border-orange-200" },
   early_leave: { label: "🚪 早退", color: "bg-blue-50 text-blue-700 border-blue-200" },
 };
@@ -79,7 +81,7 @@ export default function Absence() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
-    requestType: "absence" as RequestType,
+    requestType: "absence" as MemberRequestType,
     targetDate: "",
     arrivalTime: "",
     leaveTime: "",
@@ -235,7 +237,7 @@ export default function Absence() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>申請種別</Label>
-              <Select value={form.requestType} onValueChange={v => setForm(f => ({ ...f, requestType: v as RequestType }))}>
+              <Select value={form.requestType} onValueChange={v => setForm(f => ({ ...f, requestType: v as MemberRequestType }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="absence">欠席</SelectItem>

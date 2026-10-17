@@ -164,19 +164,21 @@ export async function deleteUserAccount(userId: number) {
 
 // ─── Attendance statistics ────────────────────────────────────────────────────
 const approvedStatus = sql`'teacher_approved'`;
-const absenceTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'absence' THEN 1 ELSE 0 END), 0)`;
+const absenceTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} IN ('absence', 'unexcused') THEN 1 ELSE 0 END), 0)`;
 const lateTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'late' THEN 1 ELSE 0 END), 0)`;
 const earlyLeaveTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'early_leave' THEN 1 ELSE 0 END), 0)`;
+const unexcusedTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} AND ${absenceRequests.requestType} = 'unexcused' THEN 1 ELSE 0 END), 0)`;
 const attendanceTotal = sql<number>`COALESCE(SUM(CASE WHEN ${absenceRequests.status} = ${approvedStatus} THEN 1 ELSE 0 END), 0)`;
 
 export async function getAttendanceStatsForUser(userId: number) {
   const db = await getDb();
-  if (!db) return { absenceCount: 0, lateCount: 0, earlyLeaveCount: 0, totalCount: 0 };
+  if (!db) return { absenceCount: 0, lateCount: 0, earlyLeaveCount: 0, unexcusedCount: 0, totalCount: 0 };
   const result = await db
     .select({
       absenceCount: absenceTotal,
       lateCount: lateTotal,
       earlyLeaveCount: earlyLeaveTotal,
+      unexcusedCount: unexcusedTotal,
       totalCount: attendanceTotal,
     })
     .from(absenceRequests)
@@ -186,6 +188,7 @@ export async function getAttendanceStatsForUser(userId: number) {
     absenceCount: Number(stats?.absenceCount ?? 0),
     lateCount: Number(stats?.lateCount ?? 0),
     earlyLeaveCount: Number(stats?.earlyLeaveCount ?? 0),
+    unexcusedCount: Number(stats?.unexcusedCount ?? 0),
     totalCount: Number(stats?.totalCount ?? 0),
   };
 }
@@ -203,6 +206,7 @@ export async function getAttendanceStatsForAllUsers() {
       absenceCount: absenceTotal,
       lateCount: lateTotal,
       earlyLeaveCount: earlyLeaveTotal,
+      unexcusedCount: unexcusedTotal,
       totalCount: attendanceTotal,
     })
     .from(users)
@@ -215,6 +219,7 @@ export async function getAttendanceStatsForAllUsers() {
     absenceCount: Number(stats.absenceCount ?? 0),
     lateCount: Number(stats.lateCount ?? 0),
     earlyLeaveCount: Number(stats.earlyLeaveCount ?? 0),
+    unexcusedCount: Number(stats.unexcusedCount ?? 0),
     totalCount: Number(stats.totalCount ?? 0),
   }));
 }
@@ -436,6 +441,8 @@ const absenceRequestWithMemberFields = {
   teacherApproverId: absenceRequests.teacherApproverId,
   teacherApprovedAt: absenceRequests.teacherApprovedAt,
   teacherComment: absenceRequests.teacherComment,
+  isManualRecord: absenceRequests.isManualRecord,
+  recordedById: absenceRequests.recordedById,
   createdAt: absenceRequests.createdAt,
   updatedAt: absenceRequests.updatedAt,
   requesterName: users.name,
@@ -527,6 +534,80 @@ export async function createAbsenceRequest(data: InsertAbsenceRequest) {
   await db.insert(absenceRequests).values(data);
 }
 
+/** A management-entered attendance issue is already confirmed and bypasses approval queues. */
+export async function createManualAttendanceRecord(data: {
+  requesterId: number;
+  requestType: "absence" | "late" | "early_leave" | "unexcused";
+  targetDate: string;
+  arrivalTime?: string | null;
+  leaveTime?: string | null;
+  reason: string;
+  recordedById: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(absenceRequests).values({
+    ...data,
+    status: "teacher_approved",
+    isManualRecord: true,
+  });
+}
+
+/** Submitted or confirmed attendance issues grouped by date for management planning. */
+export async function getAvailabilityByMonth(year: number, month: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endExclusive = month === 12
+    ? `${year + 1}-01-01`
+    : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const records = await db
+    .select({
+      id: absenceRequests.id,
+      requesterId: absenceRequests.requesterId,
+      requestType: absenceRequests.requestType,
+      targetDate: absenceRequests.targetDate,
+      arrivalTime: absenceRequests.arrivalTime,
+      leaveTime: absenceRequests.leaveTime,
+      reason: absenceRequests.reason,
+      status: absenceRequests.status,
+      isManualRecord: absenceRequests.isManualRecord,
+      recordedById: absenceRequests.recordedById,
+      requesterName: users.name,
+      requesterPart: users.part,
+    })
+    .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
+    .where(and(
+      or(
+        eq(absenceRequests.status, "pending"),
+        eq(absenceRequests.status, "section_approved"),
+        eq(absenceRequests.status, "president_approved"),
+        eq(absenceRequests.status, "teacher_approved"),
+      ),
+      sql`${absenceRequests.targetDate} >= ${start}`,
+      sql`${absenceRequests.targetDate} < ${endExclusive}`,
+    ))
+    .orderBy(absenceRequests.targetDate, absenceRequests.requestType, users.part, users.name);
+
+  const grouped = new Map<string, typeof records>();
+  for (const record of records) {
+    const current = grouped.get(record.targetDate) ?? [];
+    current.push(record);
+    grouped.set(record.targetDate, current);
+  }
+
+  return Array.from(grouped, ([date, dayRecords]) => ({
+    date,
+    unavailableCount: new Set(dayRecords.map((record) => record.requesterId)).size,
+    absenceCount: dayRecords.filter((record) => record.requestType === "absence" || record.requestType === "unexcused").length,
+    unexcusedCount: dayRecords.filter((record) => record.requestType === "unexcused").length,
+    lateCount: dayRecords.filter((record) => record.requestType === "late").length,
+    earlyLeaveCount: dayRecords.filter((record) => record.requestType === "early_leave").length,
+    records: dayRecords,
+  }));
+}
+
 export async function updateAbsenceRequest(id: number, data: Partial<AbsenceRequest>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -571,6 +652,7 @@ export async function getEnsembleAttendanceByDate(date: string) {
       leaveTime: absenceRequests.leaveTime,
       reason: absenceRequests.reason,
       status: absenceRequests.status,
+      isManualRecord: absenceRequests.isManualRecord,
       createdAt: absenceRequests.createdAt,
       requesterName: users.name,
       requesterPart: users.part,

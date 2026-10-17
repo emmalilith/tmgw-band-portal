@@ -29,6 +29,13 @@ const TYPE_CONFIG = {
     dot: "bg-red-500",
     badgeClass: "bg-red-500/20 text-red-300 border-red-500/30",
   },
+  unexcused: {
+    label: "無断欠席",
+    icon: AlertCircle,
+    color: "bg-rose-100 text-rose-800 border-rose-200",
+    dot: "bg-rose-500",
+    badgeClass: "bg-rose-500/20 text-rose-200 border-rose-500/30",
+  },
   late: {
     label: "遅刻",
     icon: Clock,
@@ -55,7 +62,7 @@ function AttendanceMember({
 }: {
   name: string | null;
   part: string | null;
-  requestType: "absence" | "late" | "early_leave";
+  requestType: "absence" | "late" | "early_leave" | "unexcused";
   arrivalTime: string | null | undefined;
   leaveTime: string | null | undefined;
   reason: string;
@@ -118,7 +125,7 @@ export default function EnsembleAttendance() {
   const practice = attendanceData?.practice ?? null;
 
   const grouped = useMemo(() => {
-    const map: Record<string, typeof absences> = { absence: [], late: [], early_leave: [] };
+    const map: Record<string, typeof absences> = { absence: [], unexcused: [], late: [], early_leave: [] };
     for (const a of absences) {
       map[a.requestType]?.push(a);
     }
@@ -300,7 +307,7 @@ export default function EnsembleAttendance() {
             <div className="space-y-4">
               {/* Summary badges */}
               <div className="flex gap-3 flex-wrap">
-                {(["absence", "late", "early_leave"] as const).map((type) => {
+                {(["absence", "unexcused", "late", "early_leave"] as const).map((type) => {
                   const count = grouped[type]?.length ?? 0;
                   if (count === 0) return null;
                   const cfg = TYPE_CONFIG[type];
@@ -318,7 +325,7 @@ export default function EnsembleAttendance() {
               </div>
 
               {/* Absence groups */}
-              {(["absence", "late", "early_leave"] as const).map((type) => {
+              {(["absence", "unexcused", "late", "early_leave"] as const).map((type) => {
                 const members = grouped[type] ?? [];
                 if (members.length === 0) return null;
                 const cfg = TYPE_CONFIG[type];
@@ -338,7 +345,7 @@ export default function EnsembleAttendance() {
                           key={m.id}
                           name={m.requesterName}
                           part={m.requesterPart}
-                          requestType={m.requestType as "absence" | "late" | "early_leave"}
+                          requestType={m.requestType as "absence" | "unexcused" | "late" | "early_leave"}
                           arrivalTime={m.arrivalTime}
                           leaveTime={m.leaveTime}
                           reason={m.reason}

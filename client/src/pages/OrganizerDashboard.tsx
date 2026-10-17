@@ -83,10 +83,11 @@ export default function OrganizerDashboard() {
   const totals = (attendance ?? []).reduce(
     (sum, member) => ({
       absence: sum.absence + member.absenceCount,
+      unexcused: sum.unexcused + member.unexcusedCount,
       late: sum.late + member.lateCount,
       earlyLeave: sum.earlyLeave + member.earlyLeaveCount,
     }),
-    { absence: 0, late: 0, earlyLeave: 0 }
+    { absence: 0, unexcused: 0, late: 0, earlyLeave: 0 }
   );
   const membersWithRecords = (attendance ?? []).filter((member) => member.totalCount > 0);
 
@@ -111,7 +112,7 @@ export default function OrganizerDashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-br from-violet-50 to-purple-50">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="rounded-2xl bg-violet-600 text-white p-3"><CalendarDays className="w-6 h-6" /></div>
@@ -133,6 +134,13 @@ export default function OrganizerDashboard() {
           </CardContent>
           <CardContent className="pt-0 px-5 pb-5"><Button className="w-full bg-amber-500 hover:bg-amber-600" onClick={() => setLocation("/ensemble-attendance")}>合奏出欠を開く</Button></CardContent>
         </Card>
+        <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="rounded-2xl bg-rose-500 text-white p-3"><UserRoundCheck className="w-6 h-6" /></div>
+            <div><p className="font-black">月間出欠・空き状況</p><p className="text-sm text-muted-foreground">不在人数を見て合奏日を計画</p></div>
+          </CardContent>
+          <CardContent className="pt-0 px-5 pb-5"><Button className="w-full bg-rose-500 hover:bg-rose-600" onClick={() => setLocation("/admin/attendance")}>出欠管理を開く</Button></CardContent>
+        </Card>
       </section>
 
       <section>
@@ -144,8 +152,9 @@ export default function OrganizerDashboard() {
           <Button variant="outline" onClick={() => setLocation("/admin/approvals")}>申請を承認</Button>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <StatTile label="欠席" count={totals.absence} className="bg-red-50 text-red-700" />
+          <StatTile label="無断欠席" count={totals.unexcused} className="bg-rose-100 text-rose-800" />
           <StatTile label="遅刻" count={totals.late} className="bg-amber-50 text-amber-700" />
           <StatTile label="早退" count={totals.earlyLeave} className="bg-sky-50 text-sky-700" />
         </div>
@@ -167,6 +176,7 @@ export default function OrganizerDashboard() {
                     <div className="mr-auto min-w-32"><p className="font-bold text-sm">{member.name ?? "名前未設定"}</p><p className="text-xs text-muted-foreground">{member.part ?? "パート未設定"}</p></div>
                     <div className="flex gap-2 text-xs font-bold">
                       <span className="rounded-full bg-red-50 text-red-700 px-2.5 py-1">欠席 {member.absenceCount}</span>
+                      <span className="rounded-full bg-rose-100 text-rose-800 px-2.5 py-1">無断 {member.unexcusedCount}</span>
                       <span className="rounded-full bg-amber-50 text-amber-700 px-2.5 py-1">遅刻 {member.lateCount}</span>
                       <span className="rounded-full bg-sky-50 text-sky-700 px-2.5 py-1">早退 {member.earlyLeaveCount}</span>
                     </div>

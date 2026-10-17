@@ -17,6 +17,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminApprovals from "./pages/AdminApprovals";
 import EnsembleAttendance from "./pages/EnsembleAttendance";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
+import AdminAttendance from "./pages/AdminAttendance";
 import Login from "./pages/Login";
 
 function Router() {
@@ -42,6 +43,7 @@ function Router() {
         <Route path="/admin/users" component={AdminUsers} />
         <Route path="/admin/approvals" component={AdminApprovals} />
         <Route path="/admin/organizer" component={OrganizerDashboard} />
+        <Route path="/admin/attendance" component={AdminAttendance} />
         <Route path="/ensemble-attendance" component={EnsembleAttendance} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />

@@ -129,8 +129,8 @@ export type InsertPracticeSchedule = typeof practiceSchedules.$inferInsert;
 export const absenceRequests = mysqlTable("absence_requests", {
   id: int("id").autoincrement().primaryKey(),
   requesterId: int("requesterId").notNull(),
-  /** absence | late | early_leave */
-  requestType: mysqlEnum("requestType", ["absence", "late", "early_leave"]).notNull(),
+  /** absence | late | early_leave | unexcused */
+  requestType: mysqlEnum("requestType", ["absence", "late", "early_leave", "unexcused"]).notNull(),
   targetDate: varchar("targetDate", { length: 10 }).notNull(),
   /** 遅刻の場合の到着予定時刻 */
   arrivalTime: varchar("arrivalTime", { length: 8 }),
@@ -151,6 +151,10 @@ export const absenceRequests = mysqlTable("absence_requests", {
   teacherApproverId: int("teacherApproverId"),
   teacherApprovedAt: timestamp("teacherApprovedAt"),
   teacherComment: text("teacherComment"),
+  /** True when a president/teacher logs an attendance issue on a member's behalf. */
+  isManualRecord: boolean("isManualRecord").default(false).notNull(),
+  /** The management account that entered a manual record, if applicable. */
+  recordedById: int("recordedById"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
