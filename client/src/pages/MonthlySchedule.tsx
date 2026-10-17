@@ -165,16 +165,17 @@ export default function MonthlySchedule() {
     setOcrStatus("文字を読み取る準備をしています…（初回のみ少し時間がかかります）");
     try {
       const { createWorker } = await import("tesseract.js");
-      const makeWorker = (languages: string) => createWorker(languages, 1, {
-        // Direct worker loading is more reliable on hosted sites that restrict Blob workers.
-        workerBlobURL: false,
+      const makeWorker = (language: "jpn" | "eng") => createWorker(language, 1, {
+        // Use an explicit per-language CDN directory rather than relying on a combined
+        // language path; this is more dependable in hosted browser workers.
+        langPath: `https://cdn.jsdelivr.net/npm/@tesseract.js-data/${language}/4.0.0_best_int`,
         logger: (message) => {
           if (message.status === "recognizing text") {
             setOcrStatus(`文字を読み取っています… ${Math.round(message.progress * 100)}%`);
           }
         },
       });
-      let worker = await makeWorker("jpn+eng");
+      let worker = await makeWorker("jpn");
       await worker.setParameters({ preserve_interword_spaces: "1" });
       let result = await worker.recognize(file);
       await worker.terminate();
