@@ -165,16 +165,27 @@ export default function MonthlySchedule() {
     setOcrStatus("文字を読み取る準備をしています…（初回のみ少し時間がかかります）");
     try {
       const { createWorker } = await import("tesseract.js");
-      const worker = await createWorker("jpn+eng", 1, {
+      const makeWorker = (languages: string) => createWorker(languages, 1, {
         logger: (message) => {
           if (message.status === "recognizing text") {
             setOcrStatus(`文字を読み取っています… ${Math.round(message.progress * 100)}%`);
           }
         },
       });
+      let worker = await makeWorker("jpn+eng");
       await worker.setParameters({ preserve_interword_spaces: "1" });
-      const result = await worker.recognize(file);
+      let result = await worker.recognize(file);
       await worker.terminate();
+
+      // Some mobile screenshots fail to load Japanese training data in-browser.
+      // Fall back to English/numeral recognition so dates and times can still be reviewed.
+      if (!result.data.text.trim()) {
+        setOcrStatus("日本語の読み取り結果が空のため、日付・時刻用の再読み取りをしています…");
+        worker = await makeWorker("eng");
+        await worker.setParameters({ preserve_interword_spaces: "1" });
+        result = await worker.recognize(file);
+        await worker.terminate();
+      }
 
       const fallback = /^\d{4}-\d{2}$/.test(importMonth)
         ? parseISO(`${importMonth}-01`)
