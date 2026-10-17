@@ -5,6 +5,8 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     getAllUsers: vi.fn().mockResolvedValue([]),
+    getUserById: vi.fn().mockResolvedValue({ id: 2, role: "member", part: "Flute" }),
+    updateUserPart: vi.fn().mockResolvedValue(undefined),
     getPendingAbsenceRequests: vi.fn().mockResolvedValue([]),
     getPendingAbsenceRequestsForPart: vi.fn().mockResolvedValue([]),
     createSchedules: vi.fn().mockResolvedValue(undefined),
@@ -140,6 +142,19 @@ describe("RBAC - organizer-only procedures", () => {
   it("member cannot remove an account", async () => {
     const caller = appRouter.createCaller(createMemberContext());
     await expect(caller.users.remove({ userId: 1 })).rejects.toThrow();
+  });
+
+  it("organizer can assign a part to an existing member", async () => {
+    await expect(
+      appRouter.createCaller(createAdminContext()).users.updatePart({ userId: 2, part: "Clarinet" })
+    ).resolves.not.toThrow();
+    expect(db.updateUserPart).toHaveBeenCalledWith(2, "Clarinet");
+  });
+
+  it("member cannot change another member's part", async () => {
+    await expect(
+      appRouter.createCaller(createMemberContext()).users.updatePart({ userId: 1, part: "Trumpet" })
+    ).rejects.toThrow();
   });
 });
 

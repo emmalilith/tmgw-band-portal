@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -11,7 +12,8 @@ import {
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { Shield, Trash2, Users } from "lucide-react";
+import { Save, Shield, Trash2, Users } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 
@@ -26,6 +28,7 @@ const roleConfig = {
 export default function AdminUsers() {
   const { user } = useAuth();
   const utils = trpc.useUtils();
+  const [partDrafts, setPartDrafts] = useState<Record<number, string>>({});
 
   if (user?.role !== "admin") {
     return (
@@ -42,6 +45,10 @@ export default function AdminUsers() {
   const updateRoleMutation = trpc.users.updateRole.useMutation({
     onSuccess: () => { utils.users.list.invalidate(); toast.success("ロールを更新しました"); },
     onError: (error) => toast.error(error.message || "更新に失敗しました"),
+  });
+  const updatePartMutation = trpc.users.updatePart.useMutation({
+    onSuccess: () => { utils.users.list.invalidate(); toast.success("パートを更新しました"); },
+    onError: (error) => toast.error(error.message || "パートの更新に失敗しました"),
   });
   const removeUserMutation = trpc.users.remove.useMutation({
     onSuccess: () => { utils.users.list.invalidate(); toast.success("アカウントを削除しました"); },
@@ -102,7 +109,7 @@ export default function AdminUsers() {
               {members?.map(m => {
                 const roleCfg = roleConfig[m.role as keyof typeof roleConfig] ?? roleConfig.user;
                 return (
-                  <div key={m.id} className="flex items-center gap-4 px-6 py-4 hover:bg-secondary/30 transition-colors">
+                  <div key={m.id} className="flex flex-wrap items-center gap-3 px-6 py-4 hover:bg-secondary/30 transition-colors">
                     <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="text-sm font-medium text-primary">
                         {m.name?.charAt(0).toUpperCase() ?? "?"}
@@ -112,7 +119,7 @@ export default function AdminUsers() {
                       <p className="font-medium text-sm truncate">{m.name ?? "名前未設定"}</p>
                       <p className="text-xs text-muted-foreground truncate">{m.email ?? "-"}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-muted-foreground hidden sm:block">
                         {format(new Date(m.createdAt), "yyyy/M/d 登録", { locale: ja })}
                       </span>
@@ -130,6 +137,31 @@ export default function AdminUsers() {
                           <SelectItem value="member">部員</SelectItem>
                         </SelectContent>
                       </Select>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          className="h-8 w-28 text-xs"
+                          aria-label={`${m.name ?? "部員"}のパート`}
+                          placeholder="パート"
+                          value={partDrafts[m.id] ?? m.part ?? ""}
+                          onChange={(event) => setPartDrafts((drafts) => ({ ...drafts, [m.id]: event.target.value }))}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" && !updatePartMutation.isPending) {
+                              updatePartMutation.mutate({ userId: m.id, part: partDrafts[m.id] ?? m.part ?? "" });
+                            }
+                          }}
+                          disabled={updatePartMutation.isPending}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          disabled={updatePartMutation.isPending}
+                          onClick={() => updatePartMutation.mutate({ userId: m.id, part: partDrafts[m.id] ?? m.part ?? "" })}
+                          title="パートを保存"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"

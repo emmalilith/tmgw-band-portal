@@ -223,7 +223,12 @@ async function getAllUsers() {
 async function updateUserRole(userId, role, part) {
   const db = await getDb();
   if (!db) return;
-  await db.update(users).set({ role, part: part ?? null }).where(eq(users.id, userId));
+  await db.update(users).set({ role, ...part !== void 0 ? { part: part.trim() || null } : {} }).where(eq(users.id, userId));
+}
+async function updateUserPart(userId, part) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ part: part?.trim() || null }).where(eq(users.id, userId));
 }
 async function getUserById(userId) {
   const db = await getDb();
@@ -889,6 +894,11 @@ var appRouter = router({
         });
       }
       return updateUserRole(input.userId, input.role, input.part);
+    }),
+    updatePart: adminProcedure2.input(z2.object({ userId: z2.number(), part: z2.string().max(128).optional() })).mutation(async ({ input }) => {
+      const target = await getUserById(input.userId);
+      if (!target) throw new TRPCError3({ code: "NOT_FOUND", message: "\u30A2\u30AB\u30A6\u30F3\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
+      return updateUserPart(input.userId, input.part?.trim() || null);
     }),
     remove: adminProcedure2.input(z2.object({ userId: z2.number() })).mutation(async ({ ctx, input }) => {
       if (input.userId === ctx.user.id) {

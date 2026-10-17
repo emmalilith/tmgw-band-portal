@@ -42,6 +42,7 @@ import {
   updatePracticeSchedule,
   updateSchedule,
   updateUserRole,
+  updateUserPart,
   deleteUserAccount,
   createAbsenceRequest,
   getAbsenceRequestsByUser,
@@ -160,6 +161,13 @@ export const appRouter = router({
           });
         }
         return updateUserRole(input.userId, input.role, input.part);
+      }),
+    updatePart: adminProcedure
+      .input(z.object({ userId: z.number(), part: z.string().max(128).optional() }))
+      .mutation(async ({ input }) => {
+        const target = await getUserById(input.userId);
+        if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "アカウントが見つかりません" });
+        return updateUserPart(input.userId, input.part?.trim() || null);
       }),
     remove: adminProcedure
       .input(z.object({ userId: z.number() }))

@@ -109,7 +109,17 @@ export async function getAllUsers() {
 export async function updateUserRole(userId: number, role: "admin" | "section_leader" | "member", part?: string) {
   const db = await getDb();
   if (!db) return;
-  await db.update(users).set({ role, part: part ?? null }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ role, ...(part !== undefined ? { part: part.trim() || null } : {}) })
+    .where(eq(users.id, userId));
+}
+
+/** Organizer-managed correction for an existing member's instrument/section. */
+export async function updateUserPart(userId: number, part: string | null) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ part: part?.trim() || null }).where(eq(users.id, userId));
 }
 
 export async function getUserById(userId: number) {
