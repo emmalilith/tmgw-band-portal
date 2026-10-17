@@ -324,6 +324,12 @@ async function createSchedule(data) {
   if (!db) throw new Error("DB not available");
   await db.insert(schedules).values(data);
 }
+async function createSchedules(data) {
+  if (data.length === 0) return;
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(schedules).values(data);
+}
 async function updateSchedule(id, data) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -418,15 +424,49 @@ async function getAbsenceRequestsByUser(userId) {
   if (!db) return [];
   return db.select().from(absenceRequests).where(eq(absenceRequests.requesterId, userId)).orderBy(desc(absenceRequests.createdAt));
 }
+var absenceRequestWithMemberFields = {
+  id: absenceRequests.id,
+  requesterId: absenceRequests.requesterId,
+  requestType: absenceRequests.requestType,
+  targetDate: absenceRequests.targetDate,
+  arrivalTime: absenceRequests.arrivalTime,
+  leaveTime: absenceRequests.leaveTime,
+  reason: absenceRequests.reason,
+  status: absenceRequests.status,
+  sectionLeaderApproverId: absenceRequests.sectionLeaderApproverId,
+  sectionLeaderApprovedAt: absenceRequests.sectionLeaderApprovedAt,
+  sectionLeaderComment: absenceRequests.sectionLeaderComment,
+  teacherApproverId: absenceRequests.teacherApproverId,
+  teacherApprovedAt: absenceRequests.teacherApprovedAt,
+  teacherComment: absenceRequests.teacherComment,
+  createdAt: absenceRequests.createdAt,
+  updatedAt: absenceRequests.updatedAt,
+  requesterName: users.name,
+  requesterEmail: users.email,
+  requesterPart: users.part
+};
 async function getPendingAbsenceRequests() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(absenceRequests).where(or(eq(absenceRequests.status, "pending"), eq(absenceRequests.status, "section_approved"))).orderBy(desc(absenceRequests.createdAt));
+  return db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(or(eq(absenceRequests.status, "pending"), eq(absenceRequests.status, "section_approved"))).orderBy(desc(absenceRequests.createdAt));
+}
+async function getPendingAbsenceRequestsForPart(part) {
+  const normalizedPart = part?.trim();
+  if (!normalizedPart) return [];
+  const db = await getDb();
+  if (!db) return [];
+  return db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(and(eq(absenceRequests.status, "pending"), eq(users.part, normalizedPart))).orderBy(desc(absenceRequests.createdAt));
 }
 async function getAllAbsenceRequests() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(absenceRequests).orderBy(desc(absenceRequests.createdAt));
+  return db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).orderBy(desc(absenceRequests.createdAt));
+}
+async function getAbsenceRequestWithRequesterById(id) {
+  const db = await getDb();
+  if (!db) return void 0;
+  const result = await db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(eq(absenceRequests.id, id)).limit(1);
+  return result[0];
 }
 async function createAbsenceRequest(data) {
   const db = await getDb();
@@ -775,6 +815,20 @@ var leaderOrAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
     throw new TRPCError3({ code: "FORBIDDEN", message: "\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u4EE5\u4E0A\u306E\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059" });
   return next({ ctx });
 });
+var sectionLeaderProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "section_leader") {
+    throw new TRPCError3({
+      code: "FORBIDDEN",
+      message: "\u4E00\u6B21\u627F\u8A8D\u306F\u7533\u8ACB\u8005\u3068\u540C\u3058\u30D1\u30FC\u30C8\u306E\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u3060\u3051\u304C\u884C\u3048\u307E\u3059"
+    });
+  }
+  return next({ ctx });
+});
+function isSamePart(first, second) {
+  return Boolean(
+    first?.trim() && second?.trim() && first.trim().toLocaleLowerCase() === second.trim().toLocaleLowerCase()
+  );
+}
 function toClientUser(user) {
   const { passwordHash: _passwordHash, ...safeUser } = user;
   return safeUser;
@@ -876,6 +930,23 @@ var appRouter = router({
       })
     ).mutation(
       ({ ctx, input }) => createSchedule({ ...input, createdById: ctx.user.id })
+    ),
+    importReviewed: adminProcedure2.input(
+      z2.object({
+        entries: z2.array(
+          z2.object({
+            title: z2.string().min(1).max(255),
+            description: z2.string().optional(),
+            scheduleDate: z2.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            startTime: z2.string().optional(),
+            endTime: z2.string().optional(),
+            location: z2.string().optional(),
+            type: z2.enum(["practice", "event", "lesson", "concert", "holiday"])
+          })
+        ).min(1).max(100)
+      })
+    ).mutation(
+      ({ ctx, input }) => createSchedules(input.entries.map((entry) => ({ ...entry, createdById: ctx.user.id })))
     ),
     update: leaderOrAdminProcedure.input(
       z2.object({
@@ -1015,7 +1086,9 @@ var appRouter = router({
     myRequests: protectedProcedure.query(
       ({ ctx }) => getAbsenceRequestsByUser(ctx.user.id)
     ),
-    pending: leaderOrAdminProcedure.query(() => getPendingAbsenceRequests()),
+    pending: leaderOrAdminProcedure.query(
+      ({ ctx }) => ctx.user.role === "admin" ? getPendingAbsenceRequests() : getPendingAbsenceRequestsForPart(ctx.user.part)
+    ),
     all: adminProcedure2.query(() => getAllAbsenceRequests()),
     create: protectedProcedure.input(
       z2.object({
@@ -1025,20 +1098,42 @@ var appRouter = router({
         leaveTime: z2.string().optional(),
         reason: z2.string().min(1)
       })
-    ).mutation(
-      ({ ctx, input }) => createAbsenceRequest({
+    ).mutation(({ ctx, input }) => {
+      if (!ctx.user.part?.trim()) {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: "\u30D1\u30FC\u30C8\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002organizer\u306B\u30D1\u30FC\u30C8\u8A2D\u5B9A\u3092\u4F9D\u983C\u3057\u3066\u304B\u3089\u7533\u8ACB\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+        });
+      }
+      return createAbsenceRequest({
         ...input,
         requesterId: ctx.user.id
-      })
-    ),
-    /** パートリーダーが承認/却下 */
-    sectionApprove: leaderOrAdminProcedure.input(
+      });
+    }),
+    /** The submitter's own part leader performs the first approval/rejection. */
+    sectionApprove: sectionLeaderProcedure.input(
       z2.object({
         id: z2.number(),
         approved: z2.boolean(),
         comment: z2.string().optional()
       })
-    ).mutation(({ ctx, input }) => {
+    ).mutation(async ({ ctx, input }) => {
+      const request = await getAbsenceRequestWithRequesterById(input.id);
+      if (!request) {
+        throw new TRPCError3({ code: "NOT_FOUND", message: "\u7533\u8ACB\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
+      }
+      if (request.status !== "pending") {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: "\u3053\u306E\u7533\u8ACB\u306F\u4E00\u6B21\u627F\u8A8D\u306E\u5BFE\u8C61\u3067\u306F\u3042\u308A\u307E\u305B\u3093"
+        });
+      }
+      if (!isSamePart(ctx.user.part, request.requesterPart)) {
+        throw new TRPCError3({
+          code: "FORBIDDEN",
+          message: "\u81EA\u5206\u3068\u540C\u3058\u30D1\u30FC\u30C8\u306E\u90E8\u54E1\u306E\u7533\u8ACB\u3060\u3051\u3092\u627F\u8A8D\u3067\u304D\u307E\u3059"
+        });
+      }
       if (input.approved) {
         return updateAbsenceRequest(input.id, {
           status: "section_approved",
@@ -1055,14 +1150,24 @@ var appRouter = router({
         });
       }
     }),
-    /** 先生が最終承認/却下 */
+    /** Organizer performs the final decision only after the part-leader gate. */
     teacherApprove: adminProcedure2.input(
       z2.object({
         id: z2.number(),
         approved: z2.boolean(),
         comment: z2.string().optional()
       })
-    ).mutation(({ ctx, input }) => {
+    ).mutation(async ({ ctx, input }) => {
+      const request = await getAbsenceRequestWithRequesterById(input.id);
+      if (!request) {
+        throw new TRPCError3({ code: "NOT_FOUND", message: "\u7533\u8ACB\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
+      }
+      if (request.status !== "section_approved") {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: "\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u306E\u4E00\u6B21\u627F\u8A8D\u5F8C\u306Borganizer\u304C\u6700\u7D42\u627F\u8A8D\u3067\u304D\u307E\u3059"
+        });
+      }
       if (input.approved) {
         return updateAbsenceRequest(input.id, {
           status: "teacher_approved",

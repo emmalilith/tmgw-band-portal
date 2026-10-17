@@ -81,6 +81,10 @@ export default function Absence() {
   });
 
   const handleSubmit = () => {
+    if (!user?.part?.trim()) {
+      toast.error("パートが未設定です。organizerにパート設定を依頼してください。");
+      return;
+    }
     if (!form.targetDate || !form.reason.trim()) { toast.error("日付と理由を入力してください"); return; }
     if (form.requestType === "late" && !form.arrivalTime) { toast.error("到着予定時刻を入力してください"); return; }
     if (form.requestType === "early_leave" && !form.leaveTime) { toast.error("早退予定時刻を入力してください"); return; }
@@ -111,6 +115,7 @@ export default function Absence() {
       <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-r from-violet-50 to-pink-50">
         <CardContent className="p-4">
           <p className="text-xs font-black text-violet-600 uppercase tracking-widest mb-3">🔄 承認フロー</p>
+          <p className="text-xs text-violet-800 mb-3">あなたのパート（{user?.part?.trim() || "未設定"}）のパートリーダーだけが一次確認し、その後organizerが最終承認します。</p>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2 text-sm">
               <div className="w-8 h-8 rounded-xl bg-amber-400 flex items-center justify-center text-xs font-black text-white shadow-md">1</div>

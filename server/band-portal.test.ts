@@ -5,6 +5,15 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     getAllUsers: vi.fn().mockResolvedValue([]),
+    getPendingAbsenceRequests: vi.fn().mockResolvedValue([]),
+    getPendingAbsenceRequestsForPart: vi.fn().mockResolvedValue([]),
+    getAbsenceRequestWithRequesterById: vi.fn().mockResolvedValue({
+      id: 42,
+      requesterId: 2,
+      requesterPart: "Flute",
+      status: "pending",
+    }),
+    updateAbsenceRequest: vi.fn().mockResolvedValue(undefined),
     getAttendanceStatsForUser: vi.fn().mockResolvedValue({
       absenceCount: 2,
       lateCount: 1,
@@ -27,6 +36,7 @@ vi.mock("./db", async (importOriginal) => {
   };
 });
 
+import * as db from "./db";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -63,6 +73,27 @@ function createMemberContext(): TrpcContext {
     passwordHash: null,
     part: "Flute",
     role: "member",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  };
+  return {
+    user,
+    req: { protocol: "https", headers: {} } as TrpcContext["req"],
+    res: { clearCookie: () => {} } as unknown as TrpcContext["res"],
+  };
+}
+
+function createFluteLeaderContext(): TrpcContext {
+  const user: AuthenticatedUser = {
+    id: 3,
+    openId: "local:flute-leader@example.com",
+    email: "flute-leader@example.com",
+    name: "フルートリーダー",
+    loginMethod: "email",
+    passwordHash: null,
+    part: "Flute",
+    role: "section_leader",
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -160,5 +191,60 @@ describe("absence request workflow", () => {
   it("member cannot approve section requests", async () => {
     const caller = appRouter.createCaller(createMemberContext());
     await expect(caller.absence.sectionApprove({ id: 999, approved: true })).rejects.toThrow();
+  });
+
+  it("returns only the same-part queue to a section leader", async () => {
+    await appRouter.createCaller(createFluteLeaderContext()).absence.pending();
+    expect(db.getPendingAbsenceRequestsForPart).toHaveBeenCalledWith("Flute");
+  });
+
+  it("blocks a section leader from approving another part's request", async () => {
+    vi.mocked(db.getAbsenceRequestWithRequesterById).mockResolvedValueOnce({
+      id: 42,
+      requesterId: 4,
+      requesterPart: "Clarinet",
+      status: "pending",
+    } as never);
+    await expect(
+      appRouter.createCaller(createFluteLeaderContext()).absence.sectionApprove({ id: 42, approved: true })
+    ).rejects.toThrow("自分と同じパート");
+  });
+
+  it("allows the matching part leader to make the first approval", async () => {
+    vi.mocked(db.getAbsenceRequestWithRequesterById).mockResolvedValueOnce({
+      id: 42,
+      requesterId: 2,
+      requesterPart: "Flute",
+      status: "pending",
+    } as never);
+    await expect(
+      appRouter.createCaller(createFluteLeaderContext()).absence.sectionApprove({ id: 42, approved: true })
+    ).resolves.not.toThrow();
+    expect(db.updateAbsenceRequest).toHaveBeenCalledWith(42, expect.objectContaining({ status: "section_approved" }));
+  });
+
+  it("blocks organizer final approval until the leader gate is complete", async () => {
+    vi.mocked(db.getAbsenceRequestWithRequesterById).mockResolvedValueOnce({
+      id: 42,
+      requesterId: 2,
+      requesterPart: "Flute",
+      status: "pending",
+    } as never);
+    await expect(
+      appRouter.createCaller(createAdminContext()).absence.teacherApprove({ id: 42, approved: true })
+    ).rejects.toThrow("一次承認後");
+  });
+
+  it("allows organizer final approval after the matching leader approved", async () => {
+    vi.mocked(db.getAbsenceRequestWithRequesterById).mockResolvedValueOnce({
+      id: 42,
+      requesterId: 2,
+      requesterPart: "Flute",
+      status: "section_approved",
+    } as never);
+    await expect(
+      appRouter.createCaller(createAdminContext()).absence.teacherApprove({ id: 42, approved: true })
+    ).resolves.not.toThrow();
+    expect(db.updateAbsenceRequest).toHaveBeenCalledWith(42, expect.objectContaining({ status: "teacher_approved" }));
   });
 });

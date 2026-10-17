@@ -32,7 +32,9 @@ type AbsenceRequest = {
   sectionLeaderComment?: string | null;
   teacherApprovedAt?: Date | null;
   teacherComment?: string | null;
-  requester?: { name?: string | null; email?: string | null } | null;
+  requesterName?: string | null;
+  requesterEmail?: string | null;
+  requesterPart?: string | null;
 };
 
 const requestTypeConfig: Record<string, { label: string; color: string }> = {
@@ -114,9 +116,19 @@ export default function AdminApprovals() {
                 {requestTypeConfig[r.requestType]?.label ?? r.requestType}
               </span>
             </div>
-            <p className="font-bold text-sm">
-              {r.requester?.name ?? "不明"} さん
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-sm">
+                {r.requesterName?.trim() || "名前未設定"} さん
+              </p>
+              {r.requesterPart?.trim() && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold">
+                  {r.requesterPart}
+                </span>
+              )}
+            </div>
+            {r.requesterEmail && (
+              <p className="text-xs text-muted-foreground mt-0.5">{r.requesterEmail}</p>
+            )}
             <p className="text-sm text-muted-foreground">
               {format(parseISO(r.targetDate), "yyyy年M月d日（E）", { locale: ja })}
               {r.requestType === "late" && r.arrivalTime && (

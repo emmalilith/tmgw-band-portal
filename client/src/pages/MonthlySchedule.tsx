@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
+import { type ImportedSchedule, parseScheduleImageText } from "@/lib/scheduleImageImport";
 import {
   addMonths,
   eachDayOfInterval,
@@ -33,7 +34,7 @@ import {
   subMonths,
 } from "date-fns";
 import { ja } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageUp, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -56,6 +57,12 @@ export default function MonthlySchedule() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [imageImportOpen, setImageImportOpen] = useState(false);
+  const [importMonth, setImportMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [importRows, setImportRows] = useState<ImportedSchedule[]>([]);
+  const [ocrStatus, setOcrStatus] = useState("");
+  const [ocrRawText, setOcrRawText] = useState("");
+  const [isReadingImage, setIsReadingImage] = useState(false);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -88,6 +95,18 @@ export default function MonthlySchedule() {
       setEditingId(null);
     },
     onError: (error) => toast.error(error.message || "更新に失敗しました"),
+  });
+  const importMutation = trpc.schedules.importReviewed.useMutation({
+    onSuccess: (_result, variables) => {
+      utils.schedules.byMonth.invalidate();
+      utils.schedules.byWeek.invalidate();
+      toast.success(`${variables.entries.length}件の予定を月間・週間スケジュールへ追加しました`);
+      setImageImportOpen(false);
+      setImportRows([]);
+      setOcrStatus("");
+      setOcrRawText("");
+    },
+    onError: (error) => toast.error(error.message || "画像からの予定追加に失敗しました"),
   });
 
   const monthStart = startOfMonth(currentDate);
@@ -132,6 +151,65 @@ export default function MonthlySchedule() {
     else createMutation.mutate(form);
   };
 
+  const readScheduleImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("PNG・JPGなどの画像ファイルを選択してください");
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("画像は12MB以下にしてください");
+      return;
+    }
+
+    setIsReadingImage(true);
+    setOcrStatus("文字を読み取る準備をしています…（初回のみ少し時間がかかります）");
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("jpn+eng", 1, {
+        logger: (message) => {
+          if (message.status === "recognizing text") {
+            setOcrStatus(`文字を読み取っています… ${Math.round(message.progress * 100)}%`);
+          }
+        },
+      });
+      await worker.setParameters({ preserve_interword_spaces: "1" });
+      const result = await worker.recognize(file);
+      await worker.terminate();
+
+      const fallback = /^\d{4}-\d{2}$/.test(importMonth)
+        ? parseISO(`${importMonth}-01`)
+        : new Date();
+      const rows = parseScheduleImageText(result.data.text, fallback.getFullYear(), fallback.getMonth() + 1);
+      setImportRows(rows);
+      setOcrRawText(result.data.text.trim());
+      setOcrStatus(rows.length > 0
+        ? `${rows.length}件の候補を抽出しました。保存前に必ず内容を確認・修正してください。`
+        : "日付を含む予定を読み取れませんでした。より鮮明な画像を選ぶか、月を確認して再試行してください。"
+      );
+    } catch (error) {
+      console.error("[Schedule image import] OCR failed", error);
+      setOcrStatus("");
+      toast.error("画像の読み取りに失敗しました。画像を撮り直して再試行してください。");
+    } finally {
+      setIsReadingImage(false);
+    }
+  };
+
+  const updateImportedRow = (id: string, patch: Partial<ImportedSchedule>) => {
+    setImportRows((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  const saveImportedRows = () => {
+    const validRows = importRows
+      .map(({ id: _id, ...row }) => ({ ...row, title: row.title.trim(), scheduleDate: row.scheduleDate.trim() }))
+      .filter((row) => row.title && /^\d{4}-\d{2}-\d{2}$/.test(row.scheduleDate));
+    if (validRows.length === 0) {
+      toast.error("保存する予定を1件以上入力してください");
+      return;
+    }
+    importMutation.mutate({ entries: validRows });
+  };
+
   const selectedSchedules = selectedDay ? getSchedulesForDay(selectedDay) : [];
 
   return (
@@ -143,6 +221,11 @@ export default function MonthlySchedule() {
           <p className="text-sm text-muted-foreground mt-1 font-medium">月ごとの練習・イベント予定</p>
         </div>
         <div className="flex items-center gap-2">
+          {user?.role === "admin" && (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setImageImportOpen(true)}>
+              <ImageUp className="w-4 h-4" /> <span className="hidden sm:inline">画像から取り込む</span>
+            </Button>
+          )}
           <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -293,6 +376,91 @@ export default function MonthlySchedule() {
           )}
         </div>
       </div>
+
+      <Dialog open={imageImportOpen} onOpenChange={(open) => { setImageImportOpen(open); if (!open && !isReadingImage) setOcrStatus(""); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-bold text-lg">🖼️ 予定表の画像から取り込む</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              画像内の日付・時間・予定名を読み取り、月間スケジュールと週間スケジュールへ追加する候補を作ります。
+              <strong className="text-foreground">保存前に必ず各行を確認・修正してください。</strong>
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>予定表の対象月</Label>
+                <Input type="month" value={importMonth} onChange={(event) => setImportMonth(event.target.value)} disabled={isReadingImage} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>画像ファイル（PNG / JPG）</Label>
+                <Input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  disabled={isReadingImage}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void readScheduleImage(file);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </div>
+            </div>
+
+            {isReadingImage && (
+              <div className="flex items-center gap-2 rounded-xl bg-violet-50 p-3 text-sm text-violet-800 font-medium">
+                <Loader2 className="w-4 h-4 animate-spin" /> {ocrStatus}
+              </div>
+            )}
+            {!isReadingImage && ocrStatus && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">{ocrStatus}</div>
+            )}
+            {!isReadingImage && ocrRawText && (
+              <details className="rounded-xl border bg-muted/30 p-3 text-xs">
+                <summary className="cursor-pointer font-bold">読み取った文字を確認する</summary>
+                <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap font-sans text-muted-foreground">{ocrRawText}</pre>
+              </details>
+            )}
+
+            {importRows.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-black text-sm">取り込み候補（{importRows.length}件）</h3>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setImportRows([])} disabled={isReadingImage || importMutation.isPending}>候補をクリア</Button>
+                </div>
+                <div className="space-y-3">
+                  {importRows.map((row, index) => (
+                    <div key={row.id} className="rounded-xl border bg-violet-50/40 p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-violet-700">予定 {index + 1}</span>
+                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => setImportRows((rows) => rows.filter((candidate) => candidate.id !== row.id))} title="この候補を削除">
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1"><Label className="text-xs">予定名</Label><Input value={row.title} onChange={(event) => updateImportedRow(row.id, { title: event.target.value })} /></div>
+                        <div className="space-y-1"><Label className="text-xs">日付</Label><Input type="date" value={row.scheduleDate} onChange={(event) => updateImportedRow(row.id, { scheduleDate: event.target.value })} /></div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="space-y-1"><Label className="text-xs">開始</Label><Input type="time" value={row.startTime} onChange={(event) => updateImportedRow(row.id, { startTime: event.target.value })} /></div>
+                        <div className="space-y-1"><Label className="text-xs">終了</Label><Input type="time" value={row.endTime} onChange={(event) => updateImportedRow(row.id, { endTime: event.target.value })} /></div>
+                        <div className="space-y-1"><Label className="text-xs">種類</Label><Select value={row.type} onValueChange={(value) => updateImportedRow(row.id, { type: value as ImportedSchedule["type"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(typeConfig).map(([key, value]) => <SelectItem key={key} value={key}>{value.label}</SelectItem>)}</SelectContent></Select></div>
+                      </div>
+                      <div className="space-y-1"><Label className="text-xs">場所（任意）</Label><Input value={row.location} onChange={(event) => updateImportedRow(row.id, { location: event.target.value })} placeholder="例：音楽室" /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImageImportOpen(false)} disabled={isReadingImage || importMutation.isPending}>キャンセル</Button>
+            <Button onClick={saveImportedRows} disabled={isReadingImage || importMutation.isPending || importRows.length === 0}>
+              {importMutation.isPending ? "追加中..." : `確認済みの${importRows.length}件を追加`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

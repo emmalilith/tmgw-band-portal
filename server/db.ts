@@ -248,6 +248,14 @@ export async function createSchedule(data: InsertSchedule) {
   await db.insert(schedules).values(data);
 }
 
+/** Saves organizer-reviewed OCR schedule rows in one database operation. */
+export async function createSchedules(data: InsertSchedule[]) {
+  if (data.length === 0) return;
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(schedules).values(data);
+}
+
 export async function updateSchedule(id: number, data: Partial<InsertSchedule>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -385,20 +393,76 @@ export async function getAbsenceRequestsByUser(userId: number) {
     .orderBy(desc(absenceRequests.createdAt));
 }
 
+const absenceRequestWithMemberFields = {
+  id: absenceRequests.id,
+  requesterId: absenceRequests.requesterId,
+  requestType: absenceRequests.requestType,
+  targetDate: absenceRequests.targetDate,
+  arrivalTime: absenceRequests.arrivalTime,
+  leaveTime: absenceRequests.leaveTime,
+  reason: absenceRequests.reason,
+  status: absenceRequests.status,
+  sectionLeaderApproverId: absenceRequests.sectionLeaderApproverId,
+  sectionLeaderApprovedAt: absenceRequests.sectionLeaderApprovedAt,
+  sectionLeaderComment: absenceRequests.sectionLeaderComment,
+  teacherApproverId: absenceRequests.teacherApproverId,
+  teacherApprovedAt: absenceRequests.teacherApprovedAt,
+  teacherComment: absenceRequests.teacherComment,
+  createdAt: absenceRequests.createdAt,
+  updatedAt: absenceRequests.updatedAt,
+  requesterName: users.name,
+  requesterEmail: users.email,
+  requesterPart: users.part,
+};
+
+/** Pending and section-approved requests, including their submitter identity. */
 export async function getPendingAbsenceRequests() {
   const db = await getDb();
   if (!db) return [];
   return db
-    .select()
+    .select(absenceRequestWithMemberFields)
     .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
     .where(or(eq(absenceRequests.status, "pending"), eq(absenceRequests.status, "section_approved")))
+    .orderBy(desc(absenceRequests.createdAt));
+}
+
+/** A section leader sees only pending requests submitted by their own part. */
+export async function getPendingAbsenceRequestsForPart(part: string | null) {
+  const normalizedPart = part?.trim();
+  if (!normalizedPart) return [];
+
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select(absenceRequestWithMemberFields)
+    .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
+    .where(and(eq(absenceRequests.status, "pending"), eq(users.part, normalizedPart)))
     .orderBy(desc(absenceRequests.createdAt));
 }
 
 export async function getAllAbsenceRequests() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(absenceRequests).orderBy(desc(absenceRequests.createdAt));
+  return db
+    .select(absenceRequestWithMemberFields)
+    .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
+    .orderBy(desc(absenceRequests.createdAt));
+}
+
+/** Retrieves a request with the submitter's part for approval authorization checks. */
+export async function getAbsenceRequestWithRequesterById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select(absenceRequestWithMemberFields)
+    .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
+    .where(eq(absenceRequests.id, id))
+    .limit(1);
+  return result[0];
 }
 
 export async function createAbsenceRequest(data: InsertAbsenceRequest) {

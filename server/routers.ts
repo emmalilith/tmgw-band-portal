@@ -11,12 +11,14 @@ import {
   createLessonVisit,
   createPracticeSchedule,
   createSchedule,
+  createSchedules,
   deleteAnnouncement,
   deleteEvent,
   deleteLessonVisit,
   deletePracticeSchedule,
   deleteSchedule,
   getAllAbsenceRequests,
+  getAbsenceRequestWithRequesterById,
   getAllUsers,
   getAttendanceStatsForAllUsers,
   getAttendanceStatsForUser,
@@ -27,6 +29,7 @@ import {
   getFeaturedEvent,
   getLessonVisits,
   getPendingAbsenceRequests,
+  getPendingAbsenceRequestsForPart,
   getPracticeByDate,
   getSchedulesByMonth,
   getSchedulesByWeek,
@@ -57,6 +60,25 @@ const leaderOrAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
     throw new TRPCError({ code: "FORBIDDEN", message: "パートリーダー以上の権限が必要です" });
   return next({ ctx });
 });
+
+/** First approval is reserved for the member's own section leader. */
+const sectionLeaderProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "section_leader") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "一次承認は申請者と同じパートのパートリーダーだけが行えます",
+    });
+  }
+  return next({ ctx });
+});
+
+function isSamePart(first: string | null | undefined, second: string | null | undefined) {
+  return Boolean(
+    first?.trim() &&
+      second?.trim() &&
+      first.trim().toLocaleLowerCase() === second.trim().toLocaleLowerCase()
+  );
+}
 
 function toClientUser(user: User) {
   const { passwordHash: _passwordHash, ...safeUser } = user;
@@ -184,6 +206,28 @@ export const appRouter = router({
       )
       .mutation(({ ctx, input }) =>
         createSchedule({ ...input, createdById: ctx.user.id })
+      ),
+    importReviewed: adminProcedure
+      .input(
+        z.object({
+          entries: z
+            .array(
+              z.object({
+                title: z.string().min(1).max(255),
+                description: z.string().optional(),
+                scheduleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+                startTime: z.string().optional(),
+                endTime: z.string().optional(),
+                location: z.string().optional(),
+                type: z.enum(["practice", "event", "lesson", "concert", "holiday"]),
+              })
+            )
+            .min(1)
+            .max(100),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        createSchedules(input.entries.map((entry) => ({ ...entry, createdById: ctx.user.id })))
       ),
     update: leaderOrAdminProcedure
       .input(
@@ -356,7 +400,11 @@ export const appRouter = router({
     myRequests: protectedProcedure.query(({ ctx }) =>
       getAbsenceRequestsByUser(ctx.user.id)
     ),
-    pending: leaderOrAdminProcedure.query(() => getPendingAbsenceRequests()),
+    pending: leaderOrAdminProcedure.query(({ ctx }) =>
+      ctx.user.role === "admin"
+        ? getPendingAbsenceRequests()
+        : getPendingAbsenceRequestsForPart(ctx.user.part)
+    ),
     all: adminProcedure.query(() => getAllAbsenceRequests()),
     create: protectedProcedure
       .input(
@@ -368,14 +416,20 @@ export const appRouter = router({
       reason: z.string().min(1),
         })
       )
-      .mutation(({ ctx, input }) =>
-        createAbsenceRequest({
+      .mutation(({ ctx, input }) => {
+        if (!ctx.user.part?.trim()) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "パートが未設定です。organizerにパート設定を依頼してから申請してください。",
+          });
+        }
+        return createAbsenceRequest({
           ...input,
           requesterId: ctx.user.id,
-        })
-      ),
-    /** パートリーダーが承認/却下 */
-    sectionApprove: leaderOrAdminProcedure
+        });
+      }),
+    /** The submitter's own part leader performs the first approval/rejection. */
+    sectionApprove: sectionLeaderProcedure
       .input(
         z.object({
           id: z.number(),
@@ -383,7 +437,23 @@ export const appRouter = router({
           comment: z.string().optional(),
         })
       )
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const request = await getAbsenceRequestWithRequesterById(input.id);
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "申請が見つかりません" });
+        }
+        if (request.status !== "pending") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "この申請は一次承認の対象ではありません",
+          });
+        }
+        if (!isSamePart(ctx.user.part, request.requesterPart)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "自分と同じパートの部員の申請だけを承認できます",
+          });
+        }
         if (input.approved) {
           return updateAbsenceRequest(input.id, {
             status: "section_approved",
@@ -400,7 +470,7 @@ export const appRouter = router({
           });
         }
       }),
-    /** 先生が最終承認/却下 */
+    /** Organizer performs the final decision only after the part-leader gate. */
     teacherApprove: adminProcedure
       .input(
         z.object({
@@ -409,7 +479,17 @@ export const appRouter = router({
           comment: z.string().optional(),
         })
       )
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const request = await getAbsenceRequestWithRequesterById(input.id);
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "申請が見つかりません" });
+        }
+        if (request.status !== "section_approved") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "パートリーダーの一次承認後にorganizerが最終承認できます",
+          });
+        }
         if (input.approved) {
           return updateAbsenceRequest(input.id, {
             status: "teacher_approved",
