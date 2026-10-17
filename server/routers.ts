@@ -80,6 +80,47 @@ function isSamePart(first: string | null | undefined, second: string | null | un
   );
 }
 
+/** MySQL TIME fields reject an empty string; omit blank optional values on creation. */
+function cleanScheduleForCreate<T extends {
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+}>(input: T) {
+  const { description, startTime, endTime, location, ...required } = input;
+  const optional = {
+    description: description?.trim(),
+    startTime: startTime?.trim(),
+    endTime: endTime?.trim(),
+    location: location?.trim(),
+  };
+  return {
+    ...required,
+    ...(optional.description ? { description: optional.description } : {}),
+    ...(optional.startTime ? { startTime: optional.startTime } : {}),
+    ...(optional.endTime ? { endTime: optional.endTime } : {}),
+    ...(optional.location ? { location: optional.location } : {}),
+  };
+}
+
+/** Keep schedule edits capable of intentionally clearing an optional field. */
+function cleanScheduleForUpdate<T extends {
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+}>(input: T) {
+  const { description, startTime, endTime, location, ...required } = input;
+  const normalize = (value: string | undefined) => value === undefined ? undefined : value.trim() || null;
+  return {
+    ...required,
+    ...(description !== undefined ? { description: normalize(description) } : {}),
+    ...(startTime !== undefined ? { startTime: normalize(startTime) } : {}),
+    ...(endTime !== undefined ? { endTime: normalize(endTime) } : {}),
+    ...(location !== undefined ? { location: normalize(location) } : {}),
+  };
+}
+
 function toClientUser(user: User) {
   const { passwordHash: _passwordHash, ...safeUser } = user;
   return safeUser;
@@ -205,7 +246,7 @@ export const appRouter = router({
         })
       )
       .mutation(({ ctx, input }) =>
-        createSchedule({ ...input, createdById: ctx.user.id })
+        createSchedule(cleanScheduleForCreate({ ...input, createdById: ctx.user.id }))
       ),
     importReviewed: adminProcedure
       .input(
@@ -227,7 +268,7 @@ export const appRouter = router({
         })
       )
       .mutation(({ ctx, input }) =>
-        createSchedules(input.entries.map((entry) => ({ ...entry, createdById: ctx.user.id })))
+        createSchedules(input.entries.map((entry) => cleanScheduleForCreate({ ...entry, createdById: ctx.user.id })))
       ),
     update: leaderOrAdminProcedure
       .input(
@@ -244,7 +285,7 @@ export const appRouter = router({
       )
       .mutation(({ input }) => {
         const { id, ...data } = input;
-        return updateSchedule(id, data);
+        return updateSchedule(id, cleanScheduleForUpdate(data));
       }),
     delete: leaderOrAdminProcedure
       .input(z.object({ id: z.number() }))

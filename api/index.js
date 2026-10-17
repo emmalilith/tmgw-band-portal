@@ -829,6 +829,33 @@ function isSamePart(first, second) {
     first?.trim() && second?.trim() && first.trim().toLocaleLowerCase() === second.trim().toLocaleLowerCase()
   );
 }
+function cleanScheduleForCreate(input) {
+  const { description, startTime, endTime, location, ...required } = input;
+  const optional = {
+    description: description?.trim(),
+    startTime: startTime?.trim(),
+    endTime: endTime?.trim(),
+    location: location?.trim()
+  };
+  return {
+    ...required,
+    ...optional.description ? { description: optional.description } : {},
+    ...optional.startTime ? { startTime: optional.startTime } : {},
+    ...optional.endTime ? { endTime: optional.endTime } : {},
+    ...optional.location ? { location: optional.location } : {}
+  };
+}
+function cleanScheduleForUpdate(input) {
+  const { description, startTime, endTime, location, ...required } = input;
+  const normalize = (value) => value === void 0 ? void 0 : value.trim() || null;
+  return {
+    ...required,
+    ...description !== void 0 ? { description: normalize(description) } : {},
+    ...startTime !== void 0 ? { startTime: normalize(startTime) } : {},
+    ...endTime !== void 0 ? { endTime: normalize(endTime) } : {},
+    ...location !== void 0 ? { location: normalize(location) } : {}
+  };
+}
 function toClientUser(user) {
   const { passwordHash: _passwordHash, ...safeUser } = user;
   return safeUser;
@@ -929,7 +956,7 @@ var appRouter = router({
         type: z2.enum(["practice", "event", "lesson", "concert", "holiday"]).default("practice")
       })
     ).mutation(
-      ({ ctx, input }) => createSchedule({ ...input, createdById: ctx.user.id })
+      ({ ctx, input }) => createSchedule(cleanScheduleForCreate({ ...input, createdById: ctx.user.id }))
     ),
     importReviewed: adminProcedure2.input(
       z2.object({
@@ -946,7 +973,7 @@ var appRouter = router({
         ).min(1).max(100)
       })
     ).mutation(
-      ({ ctx, input }) => createSchedules(input.entries.map((entry) => ({ ...entry, createdById: ctx.user.id })))
+      ({ ctx, input }) => createSchedules(input.entries.map((entry) => cleanScheduleForCreate({ ...entry, createdById: ctx.user.id })))
     ),
     update: leaderOrAdminProcedure.input(
       z2.object({
@@ -961,7 +988,7 @@ var appRouter = router({
       })
     ).mutation(({ input }) => {
       const { id, ...data } = input;
-      return updateSchedule(id, data);
+      return updateSchedule(id, cleanScheduleForUpdate(data));
     }),
     delete: leaderOrAdminProcedure.input(z2.object({ id: z2.number() })).mutation(({ input }) => deleteSchedule(input.id))
   }),

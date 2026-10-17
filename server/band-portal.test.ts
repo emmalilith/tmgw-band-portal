@@ -7,6 +7,7 @@ vi.mock("./db", async (importOriginal) => {
     getAllUsers: vi.fn().mockResolvedValue([]),
     getPendingAbsenceRequests: vi.fn().mockResolvedValue([]),
     getPendingAbsenceRequestsForPart: vi.fn().mockResolvedValue([]),
+    createSchedules: vi.fn().mockResolvedValue(undefined),
     getAbsenceRequestWithRequesterById: vi.fn().mockResolvedValue({
       id: 42,
       requesterId: 2,
@@ -155,6 +156,29 @@ describe("attendance statistics", () => {
 
   it("members cannot view club-wide attendance totals", async () => {
     await expect(appRouter.createCaller(createMemberContext()).attendance.all()).rejects.toThrow();
+  });
+});
+
+describe("reviewed schedule imports", () => {
+  it("omits blank optional values so MySQL TIME columns receive NULL", async () => {
+    await appRouter.createCaller(createAdminContext()).schedules.importReviewed({
+      entries: [{
+        title: "画像からの予定",
+        scheduleDate: "2026-04-01",
+        startTime: "",
+        endTime: "",
+        location: "",
+        description: "",
+        type: "practice",
+      }],
+    });
+    expect(db.createSchedules).toHaveBeenCalledWith([
+      expect.objectContaining({ title: "画像からの予定", scheduleDate: "2026-04-01", createdById: 1 }),
+    ]);
+    const firstCall = vi.mocked(db.createSchedules).mock.calls.at(-1)?.[0][0];
+    expect(firstCall).not.toHaveProperty("startTime");
+    expect(firstCall).not.toHaveProperty("endTime");
+    expect(firstCall).not.toHaveProperty("location");
   });
 });
 
