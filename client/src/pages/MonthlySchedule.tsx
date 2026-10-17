@@ -166,6 +166,8 @@ export default function MonthlySchedule() {
     try {
       const { createWorker } = await import("tesseract.js");
       const makeWorker = (languages: string) => createWorker(languages, 1, {
+        // Direct worker loading is more reliable on hosted sites that restrict Blob workers.
+        workerBlobURL: false,
         logger: (message) => {
           if (message.status === "recognizing text") {
             setOcrStatus(`文字を読み取っています… ${Math.round(message.progress * 100)}%`);
