@@ -25,7 +25,7 @@ import { BookOpen, CheckCircle2, Clock, Plus, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type AbsenceStatus = "pending" | "section_approved" | "teacher_approved" | "rejected";
+type AbsenceStatus = "pending" | "section_approved" | "president_approved" | "teacher_approved" | "rejected";
 type RequestType = "absence" | "late" | "early_leave";
 
 const requestTypeConfig: Record<RequestType, { label: string; color: string }> = {
@@ -42,10 +42,16 @@ const statusConfig: Record<AbsenceStatus, { label: string; color: string; icon: 
     icon: <Clock className="w-3.5 h-3.5" />,
   },
   section_approved: {
-    label: "✅ パートリーダー承認済",
+    label: "② 部長確認待ち",
     color: "bg-blue-50 text-blue-700 border-blue-200",
     bar: "bg-blue-400",
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+  },
+  president_approved: {
+    label: "③ 顧問確認待ち",
+    color: "bg-violet-50 text-violet-700 border-violet-200",
+    bar: "bg-violet-400",
+    icon: <Clock className="w-3.5 h-3.5" />,
   },
   teacher_approved: {
     label: "🎉 承認完了",
@@ -103,7 +109,7 @@ export default function Absence() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black flex items-center gap-2"><span>📝</span> 遅刻・欠席・早退申請</h1>
-          <p className="text-sm text-muted-foreground mt-1 font-medium">申請はパートリーダー・先生の承認が必要です</p>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">申請はパートリーダー・部長・顧問の承認が必要です</p>
         </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" />
@@ -115,7 +121,7 @@ export default function Absence() {
       <Card className="border-0 shadow-md rounded-2xl bg-gradient-to-r from-violet-50 to-pink-50">
         <CardContent className="p-4">
           <p className="text-xs font-black text-violet-600 uppercase tracking-widest mb-3">🔄 承認フロー</p>
-          <p className="text-xs text-violet-800 mb-3">あなたのパート（{user?.part?.trim() || "未設定"}）のパートリーダーだけが一次確認し、その後organizerが最終承認します。</p>
+          <p className="text-xs text-violet-800 mb-3">あなたのパート（{user?.part?.trim() || "未設定"}）のパートリーダーが一次確認し、部長、顧問の順に確認します。</p>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2 text-sm">
               <div className="w-8 h-8 rounded-xl bg-amber-400 flex items-center justify-center text-xs font-black text-white shadow-md">1</div>
@@ -128,8 +134,13 @@ export default function Absence() {
             </div>
             <span className="text-muted-foreground font-black">→</span>
             <div className="flex items-center gap-2 text-sm">
-              <div className="w-8 h-8 rounded-xl bg-emerald-400 flex items-center justify-center text-xs font-black text-white shadow-md">3</div>
-              <span className="font-bold">先生の最終承認</span>
+              <div className="w-8 h-8 rounded-xl bg-fuchsia-400 flex items-center justify-center text-xs font-black text-white shadow-md">3</div>
+              <span className="font-bold">部長確認</span>
+            </div>
+            <span className="text-muted-foreground font-black">→</span>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-8 h-8 rounded-xl bg-emerald-400 flex items-center justify-center text-xs font-black text-white shadow-md">4</div>
+              <span className="font-bold">顧問の最終承認</span>
             </div>
           </div>
         </CardContent>
@@ -181,10 +192,17 @@ export default function Absence() {
                             {r.sectionLeaderComment && <span className="text-foreground">「{r.sectionLeaderComment}」</span>}
                           </div>
                         )}
+                        {r.presidentApprovedAt && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <CheckCircle2 className="w-3 h-3 text-fuchsia-500" />
+                            <span>部長確認: {format(new Date(r.presidentApprovedAt), "M月d日 HH:mm")}</span>
+                            {r.presidentComment && <span className="text-foreground">「{r.presidentComment}」</span>}
+                          </div>
+                        )}
                         {r.teacherApprovedAt && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            <span>先生承認: {format(new Date(r.teacherApprovedAt), "M月d日 HH:mm")}</span>
+                            <span>顧問承認: {format(new Date(r.teacherApprovedAt), "M月d日 HH:mm")}</span>
                             {r.teacherComment && <span className="text-foreground">「{r.teacherComment}」</span>}
                           </div>
                         )}
@@ -252,7 +270,7 @@ export default function Absence() {
               />
             </div>
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-              申請後、パートリーダーと先生の承認が必要です。承認されるまでお待ちください。
+              申請後、パートリーダー・部長・顧問の承認が必要です。承認されるまでお待ちください。
             </div>
           </div>
           <DialogFooter>

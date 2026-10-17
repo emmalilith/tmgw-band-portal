@@ -51,7 +51,7 @@ const practiceTypeConfig = {
 
 export default function Practice() {
   const { user } = useAuth();
-  const canManage = user?.role === "admin" || user?.role === "section_leader";
+  const canManage = Boolean(user?.isTeacher || user?.isPresident || user?.isSectionLeader);
   const utils = trpc.useUtils();
 
   const [selectedDate, setSelectedDate] = useState(new Date());

@@ -5,10 +5,13 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     getAllUsers: vi.fn().mockResolvedValue([]),
-    getUserById: vi.fn().mockResolvedValue({ id: 2, role: "member", part: "Flute" }),
+    getUserById: vi.fn().mockResolvedValue({ id: 2, role: "member", part: "Flute", isTeacher: false, isPresident: false, isSectionLeader: false }),
     updateUserPart: vi.fn().mockResolvedValue(undefined),
+    updateUserResponsibilities: vi.fn().mockResolvedValue(undefined),
     getPendingAbsenceRequests: vi.fn().mockResolvedValue([]),
     getPendingAbsenceRequestsForPart: vi.fn().mockResolvedValue([]),
+    getPendingAbsenceRequestsForPresident: vi.fn().mockResolvedValue([]),
+    getPendingAbsenceRequestsForTeacher: vi.fn().mockResolvedValue([]),
     createSchedules: vi.fn().mockResolvedValue(undefined),
     getAbsenceRequestWithRequesterById: vi.fn().mockResolvedValue({
       id: 42,
@@ -55,6 +58,9 @@ function createAdminContext(): TrpcContext {
     passwordHash: null,
     part: null,
     role: "admin",
+    isTeacher: true,
+    isPresident: true,
+    isSectionLeader: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -76,6 +82,9 @@ function createMemberContext(): TrpcContext {
     passwordHash: null,
     part: "Flute",
     role: "member",
+    isTeacher: false,
+    isPresident: false,
+    isSectionLeader: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -97,6 +106,9 @@ function createFluteLeaderContext(): TrpcContext {
     passwordHash: null,
     part: "Flute",
     role: "section_leader",
+    isTeacher: false,
+    isPresident: false,
+    isSectionLeader: true,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -262,7 +274,7 @@ describe("absence request workflow", () => {
     expect(db.updateAbsenceRequest).toHaveBeenCalledWith(42, expect.objectContaining({ status: "section_approved" }));
   });
 
-  it("blocks organizer final approval until the leader gate is complete", async () => {
+  it("blocks teacher final approval until the president gate is complete", async () => {
     vi.mocked(db.getAbsenceRequestWithRequesterById).mockResolvedValueOnce({
       id: 42,
       requesterId: 2,
@@ -271,15 +283,26 @@ describe("absence request workflow", () => {
     } as never);
     await expect(
       appRouter.createCaller(createAdminContext()).absence.teacherApprove({ id: 42, approved: true })
-    ).rejects.toThrow("一次承認後");
+    ).rejects.toThrow("部長の二次承認後");
   });
 
-  it("allows organizer final approval after the matching leader approved", async () => {
+  it("allows a president then teacher to complete the second and final approvals", async () => {
     vi.mocked(db.getAbsenceRequestWithRequesterById).mockResolvedValueOnce({
       id: 42,
       requesterId: 2,
       requesterPart: "Flute",
       status: "section_approved",
+    } as never);
+    await expect(
+      appRouter.createCaller(createAdminContext()).absence.presidentApprove({ id: 42, approved: true })
+    ).resolves.not.toThrow();
+    expect(db.updateAbsenceRequest).toHaveBeenCalledWith(42, expect.objectContaining({ status: "president_approved" }));
+
+    vi.mocked(db.getAbsenceRequestWithRequesterById).mockResolvedValueOnce({
+      id: 42,
+      requesterId: 2,
+      requesterPart: "Flute",
+      status: "president_approved",
     } as never);
     await expect(
       appRouter.createCaller(createAdminContext()).absence.teacherApprove({ id: 42, approved: true })

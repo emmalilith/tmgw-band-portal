@@ -39,10 +39,14 @@ var users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   /** メール/パスワード認証用 bcryptハッシュ */
   passwordHash: varchar("passwordHash", { length: 255 }),
-  /** admin = 顧問先生, section_leader = パートリーダー, member = 一般部員 */
+  /** Legacy single-role value retained for compatibility with existing accounts. */
   role: mysqlEnum("role", ["admin", "section_leader", "member"]).default("member").notNull(),
   /** 所属パート (e.g. Flute, Clarinet, Trumpet …) */
   part: varchar("part", { length: 64 }),
+  /** These responsibilities can be combined on the same account. */
+  isTeacher: boolean("isTeacher").default(false).notNull(),
+  isPresident: boolean("isPresident").default(false).notNull(),
+  isSectionLeader: boolean("isSectionLeader").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull()
@@ -124,12 +128,16 @@ var absenceRequests = mysqlTable("absence_requests", {
   /** 早退の場合の退出予定時刻 */
   leaveTime: varchar("leaveTime", { length: 8 }),
   reason: text("reason").notNull(),
-  /** pending | section_approved | teacher_approved | rejected */
-  status: mysqlEnum("status", ["pending", "section_approved", "teacher_approved", "rejected"]).default("pending").notNull(),
+  /** pending | section_approved | president_approved | teacher_approved | rejected */
+  status: mysqlEnum("status", ["pending", "section_approved", "president_approved", "teacher_approved", "rejected"]).default("pending").notNull(),
   /** パートリーダーの承認者ID */
   sectionLeaderApproverId: int("sectionLeaderApproverId"),
   sectionLeaderApprovedAt: timestamp("sectionLeaderApprovedAt"),
   sectionLeaderComment: text("sectionLeaderComment"),
+  /** 部長の二次承認 */
+  presidentApproverId: int("presidentApproverId"),
+  presidentApprovedAt: timestamp("presidentApprovedAt"),
+  presidentComment: text("presidentComment"),
   /** 先生の承認者ID */
   teacherApproverId: int("teacherApproverId"),
   teacherApprovedAt: timestamp("teacherApprovedAt"),
@@ -205,6 +213,12 @@ async function upsertUser(user) {
     values.role = "admin";
     updateSet.role = "admin";
   }
+  const responsibilityFields = ["isTeacher", "isPresident", "isSectionLeader"];
+  for (const field of responsibilityFields) {
+    if (user[field] === void 0) continue;
+    values[field] = user[field];
+    updateSet[field] = user[field];
+  }
   if (!values.lastSignedIn) values.lastSignedIn = /* @__PURE__ */ new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = /* @__PURE__ */ new Date();
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
@@ -220,11 +234,6 @@ async function getAllUsers() {
   if (!db) return [];
   return db.select().from(users).orderBy(users.name);
 }
-async function updateUserRole(userId, role, part) {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(users).set({ role, ...part !== void 0 ? { part: part.trim() || null } : {} }).where(eq(users.id, userId));
-}
 async function updateUserPart(userId, part) {
   const db = await getDb();
   if (!db) return;
@@ -239,8 +248,13 @@ async function getUserById(userId) {
 async function getOrganizerCount() {
   const db = await getDb();
   if (!db) return 0;
-  const result = await db.select({ count: sql`count(*)` }).from(users).where(eq(users.role, "admin"));
+  const result = await db.select({ count: sql`count(*)` }).from(users).where(eq(users.isPresident, true));
   return Number(result[0]?.count ?? 0);
+}
+async function updateUserResponsibilities(userId, responsibilities) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set(responsibilities).where(eq(users.id, userId));
 }
 async function deleteUserAccount(userId) {
   const db = await getDb();
@@ -441,6 +455,9 @@ var absenceRequestWithMemberFields = {
   sectionLeaderApproverId: absenceRequests.sectionLeaderApproverId,
   sectionLeaderApprovedAt: absenceRequests.sectionLeaderApprovedAt,
   sectionLeaderComment: absenceRequests.sectionLeaderComment,
+  presidentApproverId: absenceRequests.presidentApproverId,
+  presidentApprovedAt: absenceRequests.presidentApprovedAt,
+  presidentComment: absenceRequests.presidentComment,
   teacherApproverId: absenceRequests.teacherApproverId,
   teacherApprovedAt: absenceRequests.teacherApprovedAt,
   teacherComment: absenceRequests.teacherComment,
@@ -450,17 +467,22 @@ var absenceRequestWithMemberFields = {
   requesterEmail: users.email,
   requesterPart: users.part
 };
-async function getPendingAbsenceRequests() {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(or(eq(absenceRequests.status, "pending"), eq(absenceRequests.status, "section_approved"))).orderBy(desc(absenceRequests.createdAt));
-}
 async function getPendingAbsenceRequestsForPart(part) {
   const normalizedPart = part?.trim();
   if (!normalizedPart) return [];
   const db = await getDb();
   if (!db) return [];
   return db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(and(eq(absenceRequests.status, "pending"), eq(users.part, normalizedPart))).orderBy(desc(absenceRequests.createdAt));
+}
+async function getPendingAbsenceRequestsForPresident() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(eq(absenceRequests.status, "section_approved")).orderBy(desc(absenceRequests.createdAt));
+}
+async function getPendingAbsenceRequestsForTeacher() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select(absenceRequestWithMemberFields).from(absenceRequests).innerJoin(users, eq(absenceRequests.requesterId, users.id)).where(eq(absenceRequests.status, "president_approved")).orderBy(desc(absenceRequests.createdAt));
 }
 async function getAllAbsenceRequests() {
   const db = await getDb();
@@ -610,6 +632,7 @@ function registerLocalAuthRoutes(app2) {
       const passwordHash = await bcrypt.hash(password, 12);
       const openId = `local:${normalizedEmail}`;
       const role = ENV.adminEmail === normalizedEmail || !ENV.adminEmail && isFirstUser ? "admin" : "member";
+      const isInitialManager = role === "admin";
       await upsertUser({
         openId,
         name: normalizedName,
@@ -618,6 +641,7 @@ function registerLocalAuthRoutes(app2) {
         passwordHash,
         part: part ?? null,
         role,
+        isPresident: isInitialManager,
         lastSignedIn: /* @__PURE__ */ new Date()
       });
       const user = await getUserByOpenId(openId);
@@ -776,7 +800,7 @@ var protectedProcedure = t.procedure.use(requireUser);
 var adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
-    if (!ctx.user || ctx.user.role !== "admin") {
+    if (!ctx.user || !ctx.user.isPresident && !ctx.user.isTeacher) {
       throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
     return next({
@@ -811,17 +835,20 @@ var systemRouter = router({
 });
 
 // server/routers.ts
-var adminProcedure2 = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "\u7BA1\u7406\u8005\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059" });
+var managementProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isPresident && !ctx.user.isTeacher) {
+    throw new TRPCError3({ code: "FORBIDDEN", message: "\u90E8\u9577\u307E\u305F\u306F\u9867\u554F\u306E\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059" });
+  }
   return next({ ctx });
 });
-var leaderOrAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "admin" && ctx.user.role !== "section_leader")
-    throw new TRPCError3({ code: "FORBIDDEN", message: "\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u4EE5\u4E0A\u306E\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059" });
+var leaderOrManagementProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isSectionLeader && !ctx.user.isPresident && !ctx.user.isTeacher) {
+    throw new TRPCError3({ code: "FORBIDDEN", message: "\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u3001\u90E8\u9577\u3001\u307E\u305F\u306F\u9867\u554F\u306E\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059" });
+  }
   return next({ ctx });
 });
 var sectionLeaderProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "section_leader") {
+  if (!ctx.user.isSectionLeader) {
     throw new TRPCError3({
       code: "FORBIDDEN",
       message: "\u4E00\u6B21\u627F\u8A8D\u306F\u7533\u8ACB\u8005\u3068\u540C\u3058\u30D1\u30FC\u30C8\u306E\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u3060\u3051\u304C\u884C\u3048\u307E\u3059"
@@ -829,6 +856,20 @@ var sectionLeaderProcedure = protectedProcedure.use(({ ctx, next }) => {
   }
   return next({ ctx });
 });
+var presidentProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isPresident) {
+    throw new TRPCError3({ code: "FORBIDDEN", message: "\u4E8C\u6B21\u627F\u8A8D\u306F\u90E8\u9577\u3060\u3051\u304C\u884C\u3048\u307E\u3059" });
+  }
+  return next({ ctx });
+});
+var teacherProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isTeacher) {
+    throw new TRPCError3({ code: "FORBIDDEN", message: "\u6700\u7D42\u627F\u8A8D\u306F\u9867\u554F\u3060\u3051\u304C\u884C\u3048\u307E\u3059" });
+  }
+  return next({ ctx });
+});
+var adminProcedure2 = managementProcedure;
+var leaderOrAdminProcedure = leaderOrManagementProcedure;
 function isSamePart(first, second) {
   return Boolean(
     first?.trim() && second?.trim() && first.trim().toLocaleLowerCase() === second.trim().toLocaleLowerCase()
@@ -887,18 +928,39 @@ var appRouter = router({
     ).mutation(async ({ input }) => {
       const target = await getUserById(input.userId);
       if (!target) throw new TRPCError3({ code: "NOT_FOUND", message: "\u30A2\u30AB\u30A6\u30F3\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
-      if (target.role === "admin" && input.role !== "admin" && await getOrganizerCount() <= 1) {
+      if (target.isPresident && input.role !== "admin" && await getOrganizerCount() <= 1) {
         throw new TRPCError3({
           code: "BAD_REQUEST",
           message: "\u6700\u5F8C\u306Eorganizer\u3092\u90E8\u54E1\u307E\u305F\u306F\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u3078\u5909\u66F4\u3059\u308B\u3053\u3068\u306F\u3067\u304D\u307E\u305B\u3093"
         });
       }
-      return updateUserRole(input.userId, input.role, input.part);
+      return updateUserResponsibilities(input.userId, {
+        isTeacher: target.isTeacher,
+        isPresident: input.role === "admin",
+        isSectionLeader: input.role === "section_leader"
+      });
     }),
     updatePart: adminProcedure2.input(z2.object({ userId: z2.number(), part: z2.string().max(128).optional() })).mutation(async ({ input }) => {
       const target = await getUserById(input.userId);
       if (!target) throw new TRPCError3({ code: "NOT_FOUND", message: "\u30A2\u30AB\u30A6\u30F3\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
       return updateUserPart(input.userId, input.part?.trim() || null);
+    }),
+    updateResponsibilities: managementProcedure.input(z2.object({
+      userId: z2.number(),
+      isTeacher: z2.boolean(),
+      isPresident: z2.boolean(),
+      isSectionLeader: z2.boolean()
+    })).mutation(async ({ input }) => {
+      const target = await getUserById(input.userId);
+      if (!target) throw new TRPCError3({ code: "NOT_FOUND", message: "\u30A2\u30AB\u30A6\u30F3\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
+      if (target.isPresident && !input.isPresident && await getOrganizerCount() <= 1) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "\u6700\u5F8C\u306E\u90E8\u9577\u3092\u5916\u3059\u3053\u3068\u306F\u3067\u304D\u307E\u305B\u3093" });
+      }
+      return updateUserResponsibilities(input.userId, {
+        isTeacher: input.isTeacher,
+        isPresident: input.isPresident,
+        isSectionLeader: input.isSectionLeader
+      });
     }),
     remove: adminProcedure2.input(z2.object({ userId: z2.number() })).mutation(async ({ ctx, input }) => {
       if (input.userId === ctx.user.id) {
@@ -909,10 +971,10 @@ var appRouter = router({
       }
       const target = await getUserById(input.userId);
       if (!target) throw new TRPCError3({ code: "NOT_FOUND", message: "\u30A2\u30AB\u30A6\u30F3\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
-      if (target.role === "admin" && await getOrganizerCount() <= 1) {
+      if (target.isPresident && await getOrganizerCount() <= 1) {
         throw new TRPCError3({
           code: "BAD_REQUEST",
-          message: "\u6700\u5F8C\u306Eorganizer\u30A2\u30AB\u30A6\u30F3\u30C8\u306F\u524A\u9664\u3067\u304D\u307E\u305B\u3093"
+          message: "\u6700\u5F8C\u306E\u90E8\u9577\u30A2\u30AB\u30A6\u30F3\u30C8\u306F\u524A\u9664\u3067\u304D\u307E\u305B\u3093"
         });
       }
       await deleteUserAccount(input.userId);
@@ -1123,10 +1185,15 @@ var appRouter = router({
     myRequests: protectedProcedure.query(
       ({ ctx }) => getAbsenceRequestsByUser(ctx.user.id)
     ),
-    pending: leaderOrAdminProcedure.query(
-      ({ ctx }) => ctx.user.role === "admin" ? getPendingAbsenceRequests() : getPendingAbsenceRequestsForPart(ctx.user.part)
-    ),
-    all: adminProcedure2.query(() => getAllAbsenceRequests()),
+    pending: leaderOrManagementProcedure.query(async ({ ctx }) => {
+      const queues = await Promise.all([
+        ctx.user.isSectionLeader ? getPendingAbsenceRequestsForPart(ctx.user.part) : Promise.resolve([]),
+        ctx.user.isPresident ? getPendingAbsenceRequestsForPresident() : Promise.resolve([]),
+        ctx.user.isTeacher ? getPendingAbsenceRequestsForTeacher() : Promise.resolve([])
+      ]);
+      return Array.from(new Map(queues.flat().map((request) => [request.id, request])).values());
+    }),
+    all: managementProcedure.query(() => getAllAbsenceRequests()),
     create: protectedProcedure.input(
       z2.object({
         requestType: z2.enum(["absence", "late", "early_leave"]),
@@ -1187,8 +1254,8 @@ var appRouter = router({
         });
       }
     }),
-    /** Organizer performs the final decision only after the part-leader gate. */
-    teacherApprove: adminProcedure2.input(
+    /** The club president performs the second decision after the part-leader gate. */
+    presidentApprove: presidentProcedure.input(
       z2.object({
         id: z2.number(),
         approved: z2.boolean(),
@@ -1202,7 +1269,41 @@ var appRouter = router({
       if (request.status !== "section_approved") {
         throw new TRPCError3({
           code: "BAD_REQUEST",
-          message: "\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u306E\u4E00\u6B21\u627F\u8A8D\u5F8C\u306Borganizer\u304C\u6700\u7D42\u627F\u8A8D\u3067\u304D\u307E\u3059"
+          message: "\u30D1\u30FC\u30C8\u30EA\u30FC\u30C0\u30FC\u306E\u4E00\u6B21\u627F\u8A8D\u5F8C\u306B\u90E8\u9577\u304C\u4E8C\u6B21\u627F\u8A8D\u3067\u304D\u307E\u3059"
+        });
+      }
+      if (input.approved) {
+        return updateAbsenceRequest(input.id, {
+          status: "president_approved",
+          presidentApproverId: ctx.user.id,
+          presidentApprovedAt: /* @__PURE__ */ new Date(),
+          presidentComment: input.comment ?? null
+        });
+      } else {
+        return updateAbsenceRequest(input.id, {
+          status: "rejected",
+          presidentApproverId: ctx.user.id,
+          presidentApprovedAt: /* @__PURE__ */ new Date(),
+          presidentComment: input.comment ?? null
+        });
+      }
+    }),
+    /** The teacher gives the final decision after the president gate. */
+    teacherApprove: teacherProcedure.input(
+      z2.object({
+        id: z2.number(),
+        approved: z2.boolean(),
+        comment: z2.string().optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const request = await getAbsenceRequestWithRequesterById(input.id);
+      if (!request) {
+        throw new TRPCError3({ code: "NOT_FOUND", message: "\u7533\u8ACB\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" });
+      }
+      if (request.status !== "president_approved") {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: "\u90E8\u9577\u306E\u4E8C\u6B21\u627F\u8A8D\u5F8C\u306B\u9867\u554F\u304C\u6700\u7D42\u627F\u8A8D\u3067\u304D\u307E\u3059"
         });
       }
       if (input.approved) {

@@ -94,6 +94,7 @@ export function registerLocalAuthRoutes(app: Express) {
       const role = ENV.adminEmail === normalizedEmail || (!ENV.adminEmail && isFirstUser)
         ? "admin"
         : "member";
+      const isInitialManager = role === "admin";
 
       await db.upsertUser({
         openId,
@@ -103,6 +104,7 @@ export function registerLocalAuthRoutes(app: Express) {
         passwordHash,
         part: part ?? null,
         role,
+        isPresident: isInitialManager,
         lastSignedIn: new Date(),
       });
 

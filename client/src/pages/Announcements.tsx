@@ -43,7 +43,7 @@ type FormData = {
 export default function Announcements() {
   const { user } = useAuth();
   const utils = trpc.useUtils();
-  const canManage = user?.role === "admin" || user?.role === "section_leader";
+  const canManage = Boolean(user?.isTeacher || user?.isPresident || user?.isSectionLeader);
 
   const { data: announcements, isLoading } = trpc.announcements.list.useQuery();
   const createMutation = trpc.announcements.create.useMutation({

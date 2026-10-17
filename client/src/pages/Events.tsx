@@ -34,7 +34,7 @@ const typeConfig = {
 
 export default function Events() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = Boolean(user?.isTeacher || user?.isPresident);
   const utils = trpc.useUtils();
 
   const { data: events, isLoading } = trpc.events.list.useQuery();

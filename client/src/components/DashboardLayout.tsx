@@ -71,15 +71,15 @@ const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 
-function getRoleLabel(role?: string) {
-  if (role === "admin") return "Organizer";
-  if (role === "section_leader") return "パートリーダー";
-  return "部員";
+function getRoleLabel(user?: { isTeacher: boolean; isPresident: boolean; isSectionLeader: boolean } | null) {
+  const labels = [user?.isTeacher && "顧問", user?.isPresident && "部長", user?.isSectionLeader && "パートリーダー"].filter(Boolean);
+  return labels.length ? labels.join("・") : "部員";
 }
 
-function getRoleBadgeStyle(role?: string) {
-  if (role === "admin") return "bg-orange-400/30 text-orange-200 border-orange-400/40";
-  if (role === "section_leader") return "bg-sky-400/30 text-sky-200 border-sky-400/40";
+function getRoleBadgeStyle(user?: { isTeacher: boolean; isPresident: boolean; isSectionLeader: boolean } | null) {
+  if (user?.isTeacher) return "bg-orange-400/30 text-orange-200 border-orange-400/40";
+  if (user?.isPresident) return "bg-pink-400/30 text-pink-100 border-pink-400/40";
+  if (user?.isSectionLeader) return "bg-sky-400/30 text-sky-200 border-sky-400/40";
   return "bg-white/20 text-white/80 border-white/30";
 }
 
@@ -152,8 +152,8 @@ function DashboardLayoutContent({
   const isMobile = useIsMobile();
   const activeItem = [...mainMenuItems, ...adminMenuItems].find(i => i.path === location);
 
-  const isAdmin = user?.role === "admin";
-  const isLeaderOrAdmin = user?.role === "admin" || user?.role === "section_leader";
+  const isManagement = Boolean(user?.isPresident || user?.isTeacher);
+  const isLeadership = Boolean(user?.isSectionLeader || user?.isPresident || user?.isTeacher);
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -246,7 +246,7 @@ function DashboardLayoutContent({
             </SidebarGroup>
 
             {/* Admin / Leader section */}
-            {isLeaderOrAdmin && (
+            {isLeadership && (
               <SidebarGroup className="mt-3">
                 {!isCollapsed && (
                   <SidebarGroupLabel className="text-xs text-white/40 uppercase tracking-widest px-4 mb-1 font-bold">
@@ -255,7 +255,7 @@ function DashboardLayoutContent({
                 )}
                 <SidebarMenu className="px-2 gap-0.5">
                   {adminMenuItems.map(item => {
-                    if ((item.path === "/admin/users" || item.path === "/admin/organizer") && !isAdmin) return null;
+                    if ((item.path === "/admin/users" || item.path === "/admin/organizer") && !isManagement) return null;
                     const isActive = location === item.path;
                     return (
                       <SidebarMenuItem key={item.path}>
@@ -295,8 +295,8 @@ function DashboardLayoutContent({
                       <p className="text-sm font-bold truncate text-white leading-none">
                         {user?.name ?? "-"}
                       </p>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-md border mt-1 inline-block font-semibold ${getRoleBadgeStyle(user?.role)}`}>
-                        {getRoleLabel(user?.role)}
+                      <span className={`text-xs px-1.5 py-0.5 rounded-md border mt-1 inline-block font-semibold ${getRoleBadgeStyle(user)}`}>
+                        {getRoleLabel(user)}
                       </span>
                     </div>
                   )}

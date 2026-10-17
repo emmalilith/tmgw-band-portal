@@ -30,6 +30,8 @@ import {
   getLessonVisits,
   getPendingAbsenceRequests,
   getPendingAbsenceRequestsForPart,
+  getPendingAbsenceRequestsForPresident,
+  getPendingAbsenceRequestsForTeacher,
   getPracticeByDate,
   getSchedulesByMonth,
   getSchedulesByWeek,
@@ -43,6 +45,7 @@ import {
   updateSchedule,
   updateUserRole,
   updateUserPart,
+  updateUserResponsibilities,
   deleteUserAccount,
   createAbsenceRequest,
   getAbsenceRequestsByUser,
@@ -51,20 +54,23 @@ import {
 } from "./db";
 
 // ─── Role helpers ─────────────────────────────────────────────────────────────
-const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "管理者権限が必要です" });
+const managementProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isPresident && !ctx.user.isTeacher) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "部長または顧問の権限が必要です" });
+  }
   return next({ ctx });
 });
 
-const leaderOrAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "admin" && ctx.user.role !== "section_leader")
-    throw new TRPCError({ code: "FORBIDDEN", message: "パートリーダー以上の権限が必要です" });
+const leaderOrManagementProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isSectionLeader && !ctx.user.isPresident && !ctx.user.isTeacher) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "パートリーダー、部長、または顧問の権限が必要です" });
+  }
   return next({ ctx });
 });
 
 /** First approval is reserved for the member's own section leader. */
 const sectionLeaderProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "section_leader") {
+  if (!ctx.user.isSectionLeader) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "一次承認は申請者と同じパートのパートリーダーだけが行えます",
@@ -72,6 +78,25 @@ const sectionLeaderProcedure = protectedProcedure.use(({ ctx, next }) => {
   }
   return next({ ctx });
 });
+
+const presidentProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isPresident) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "二次承認は部長だけが行えます" });
+  }
+  return next({ ctx });
+});
+
+const teacherProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.isTeacher) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "最終承認は顧問だけが行えます" });
+  }
+  return next({ ctx });
+});
+
+// Existing management features keep the same permission boundary while their
+// procedure names are migrated away from the former single-role terminology.
+const adminProcedure = managementProcedure;
+const leaderOrAdminProcedure = leaderOrManagementProcedure;
 
 function isSamePart(first: string | null | undefined, second: string | null | undefined) {
   return Boolean(
@@ -154,13 +179,17 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const target = await getUserById(input.userId);
         if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "アカウントが見つかりません" });
-        if (target.role === "admin" && input.role !== "admin" && (await getOrganizerCount()) <= 1) {
+        if (target.isPresident && input.role !== "admin" && (await getOrganizerCount()) <= 1) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "最後のorganizerを部員またはパートリーダーへ変更することはできません",
           });
         }
-        return updateUserRole(input.userId, input.role, input.part);
+        return updateUserResponsibilities(input.userId, {
+          isTeacher: target.isTeacher,
+          isPresident: input.role === "admin",
+          isSectionLeader: input.role === "section_leader",
+        });
       }),
     updatePart: adminProcedure
       .input(z.object({ userId: z.number(), part: z.string().max(128).optional() }))
@@ -168,6 +197,25 @@ export const appRouter = router({
         const target = await getUserById(input.userId);
         if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "アカウントが見つかりません" });
         return updateUserPart(input.userId, input.part?.trim() || null);
+      }),
+    updateResponsibilities: managementProcedure
+      .input(z.object({
+        userId: z.number(),
+        isTeacher: z.boolean(),
+        isPresident: z.boolean(),
+        isSectionLeader: z.boolean(),
+      }))
+      .mutation(async ({ input }) => {
+        const target = await getUserById(input.userId);
+        if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "アカウントが見つかりません" });
+        if (target.isPresident && !input.isPresident && (await getOrganizerCount()) <= 1) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "最後の部長を外すことはできません" });
+        }
+        return updateUserResponsibilities(input.userId, {
+          isTeacher: input.isTeacher,
+          isPresident: input.isPresident,
+          isSectionLeader: input.isSectionLeader,
+        });
       }),
     remove: adminProcedure
       .input(z.object({ userId: z.number() }))
@@ -181,10 +229,10 @@ export const appRouter = router({
 
         const target = await getUserById(input.userId);
         if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "アカウントが見つかりません" });
-        if (target.role === "admin" && (await getOrganizerCount()) <= 1) {
+        if (target.isPresident && (await getOrganizerCount()) <= 1) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "最後のorganizerアカウントは削除できません",
+            message: "最後の部長アカウントは削除できません",
           });
         }
 
@@ -449,12 +497,15 @@ export const appRouter = router({
     myRequests: protectedProcedure.query(({ ctx }) =>
       getAbsenceRequestsByUser(ctx.user.id)
     ),
-    pending: leaderOrAdminProcedure.query(({ ctx }) =>
-      ctx.user.role === "admin"
-        ? getPendingAbsenceRequests()
-        : getPendingAbsenceRequestsForPart(ctx.user.part)
-    ),
-    all: adminProcedure.query(() => getAllAbsenceRequests()),
+    pending: leaderOrManagementProcedure.query(async ({ ctx }) => {
+      const queues = await Promise.all([
+        ctx.user.isSectionLeader ? getPendingAbsenceRequestsForPart(ctx.user.part) : Promise.resolve([]),
+        ctx.user.isPresident ? getPendingAbsenceRequestsForPresident() : Promise.resolve([]),
+        ctx.user.isTeacher ? getPendingAbsenceRequestsForTeacher() : Promise.resolve([]),
+      ]);
+      return Array.from(new Map(queues.flat().map((request) => [request.id, request])).values());
+    }),
+    all: managementProcedure.query(() => getAllAbsenceRequests()),
     create: protectedProcedure
       .input(
         z.object({
@@ -519,8 +570,8 @@ export const appRouter = router({
           });
         }
       }),
-    /** Organizer performs the final decision only after the part-leader gate. */
-    teacherApprove: adminProcedure
+    /** The club president performs the second decision after the part-leader gate. */
+    presidentApprove: presidentProcedure
       .input(
         z.object({
           id: z.number(),
@@ -536,7 +587,43 @@ export const appRouter = router({
         if (request.status !== "section_approved") {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "パートリーダーの一次承認後にorganizerが最終承認できます",
+            message: "パートリーダーの一次承認後に部長が二次承認できます",
+          });
+        }
+        if (input.approved) {
+          return updateAbsenceRequest(input.id, {
+            status: "president_approved",
+            presidentApproverId: ctx.user.id,
+            presidentApprovedAt: new Date(),
+            presidentComment: input.comment ?? null,
+          });
+        } else {
+          return updateAbsenceRequest(input.id, {
+            status: "rejected",
+            presidentApproverId: ctx.user.id,
+            presidentApprovedAt: new Date(),
+            presidentComment: input.comment ?? null,
+          });
+        }
+      }),
+    /** The teacher gives the final decision after the president gate. */
+    teacherApprove: teacherProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          approved: z.boolean(),
+          comment: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const request = await getAbsenceRequestWithRequesterById(input.id);
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "申請が見つかりません" });
+        }
+        if (request.status !== "president_approved") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "部長の二次承認後に顧問が最終承認できます",
           });
         }
         if (input.approved) {

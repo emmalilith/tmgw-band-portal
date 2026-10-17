@@ -20,7 +20,7 @@ import { toast } from "sonner";
 
 export default function LessonVisits() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = Boolean(user?.isTeacher || user?.isPresident);
   const utils = trpc.useUtils();
 
   const { data: visits, isLoading } = trpc.lessonVisits.list.useQuery();

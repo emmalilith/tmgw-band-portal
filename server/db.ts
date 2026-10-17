@@ -87,6 +87,12 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     values.role = "admin";
     updateSet.role = "admin";
   }
+  const responsibilityFields = ["isTeacher", "isPresident", "isSectionLeader"] as const;
+  for (const field of responsibilityFields) {
+    if (user[field] === undefined) continue;
+    values[field] = user[field];
+    updateSet[field] = user[field];
+  }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
@@ -135,8 +141,17 @@ export async function getOrganizerCount() {
   const result = await db
     .select({ count: sql<number>`count(*)` })
     .from(users)
-    .where(eq(users.role, "admin"));
+    .where(eq(users.isPresident, true));
   return Number(result[0]?.count ?? 0);
+}
+
+export async function updateUserResponsibilities(
+  userId: number,
+  responsibilities: { isTeacher: boolean; isPresident: boolean; isSectionLeader: boolean }
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set(responsibilities).where(eq(users.id, userId));
 }
 
 /** Removes a former member's login and their absence records so no orphaned records remain. */
@@ -415,6 +430,9 @@ const absenceRequestWithMemberFields = {
   sectionLeaderApproverId: absenceRequests.sectionLeaderApproverId,
   sectionLeaderApprovedAt: absenceRequests.sectionLeaderApprovedAt,
   sectionLeaderComment: absenceRequests.sectionLeaderComment,
+  presidentApproverId: absenceRequests.presidentApproverId,
+  presidentApprovedAt: absenceRequests.presidentApprovedAt,
+  presidentComment: absenceRequests.presidentComment,
   teacherApproverId: absenceRequests.teacherApproverId,
   teacherApprovedAt: absenceRequests.teacherApprovedAt,
   teacherComment: absenceRequests.teacherComment,
@@ -425,7 +443,7 @@ const absenceRequestWithMemberFields = {
   requesterPart: users.part,
 };
 
-/** Pending and section-approved requests, including their submitter identity. */
+/** All unfinished requests, including their submitter identity. */
 export async function getPendingAbsenceRequests() {
   const db = await getDb();
   if (!db) return [];
@@ -433,7 +451,11 @@ export async function getPendingAbsenceRequests() {
     .select(absenceRequestWithMemberFields)
     .from(absenceRequests)
     .innerJoin(users, eq(absenceRequests.requesterId, users.id))
-    .where(or(eq(absenceRequests.status, "pending"), eq(absenceRequests.status, "section_approved")))
+    .where(or(
+      eq(absenceRequests.status, "pending"),
+      eq(absenceRequests.status, "section_approved"),
+      eq(absenceRequests.status, "president_approved")
+    ))
     .orderBy(desc(absenceRequests.createdAt));
 }
 
@@ -449,6 +471,30 @@ export async function getPendingAbsenceRequestsForPart(part: string | null) {
     .from(absenceRequests)
     .innerJoin(users, eq(absenceRequests.requesterId, users.id))
     .where(and(eq(absenceRequests.status, "pending"), eq(users.part, normalizedPart)))
+    .orderBy(desc(absenceRequests.createdAt));
+}
+
+/** The club president reviews requests after the matching part leader. */
+export async function getPendingAbsenceRequestsForPresident() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select(absenceRequestWithMemberFields)
+    .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
+    .where(eq(absenceRequests.status, "section_approved"))
+    .orderBy(desc(absenceRequests.createdAt));
+}
+
+/** The teacher gives the final decision after the club president. */
+export async function getPendingAbsenceRequestsForTeacher() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select(absenceRequestWithMemberFields)
+    .from(absenceRequests)
+    .innerJoin(users, eq(absenceRequests.requesterId, users.id))
+    .where(eq(absenceRequests.status, "president_approved"))
     .orderBy(desc(absenceRequests.createdAt));
 }
 

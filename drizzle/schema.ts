@@ -18,10 +18,14 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   /** メール/パスワード認証用 bcryptハッシュ */
   passwordHash: varchar("passwordHash", { length: 255 }),
-  /** admin = 顧問先生, section_leader = パートリーダー, member = 一般部員 */
+  /** Legacy single-role value retained for compatibility with existing accounts. */
   role: mysqlEnum("role", ["admin", "section_leader", "member"]).default("member").notNull(),
   /** 所属パート (e.g. Flute, Clarinet, Trumpet …) */
   part: varchar("part", { length: 64 }),
+  /** These responsibilities can be combined on the same account. */
+  isTeacher: boolean("isTeacher").default(false).notNull(),
+  isPresident: boolean("isPresident").default(false).notNull(),
+  isSectionLeader: boolean("isSectionLeader").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -133,12 +137,16 @@ export const absenceRequests = mysqlTable("absence_requests", {
   /** 早退の場合の退出予定時刻 */
   leaveTime: varchar("leaveTime", { length: 8 }),
   reason: text("reason").notNull(),
-  /** pending | section_approved | teacher_approved | rejected */
-  status: mysqlEnum("status", ["pending", "section_approved", "teacher_approved", "rejected"]).default("pending").notNull(),
+  /** pending | section_approved | president_approved | teacher_approved | rejected */
+  status: mysqlEnum("status", ["pending", "section_approved", "president_approved", "teacher_approved", "rejected"]).default("pending").notNull(),
   /** パートリーダーの承認者ID */
   sectionLeaderApproverId: int("sectionLeaderApproverId"),
   sectionLeaderApprovedAt: timestamp("sectionLeaderApprovedAt"),
   sectionLeaderComment: text("sectionLeaderComment"),
+  /** 部長の二次承認 */
+  presidentApproverId: int("presidentApproverId"),
+  presidentApprovedAt: timestamp("presidentApprovedAt"),
+  presidentComment: text("presidentComment"),
   /** 先生の承認者ID */
   teacherApproverId: int("teacherApproverId"),
   teacherApprovedAt: timestamp("teacherApprovedAt"),

@@ -159,7 +159,7 @@ export default function Home() {
                 <div className="text-center py-8 text-muted-foreground">
                   <div className="text-5xl mb-3 opacity-30">🎵</div>
                   <p className="text-sm font-medium">本日の練習予定はありません</p>
-                  {(user?.role === "admin" || user?.role === "section_leader") && (
+                  {(user?.isTeacher || user?.isPresident || user?.isSectionLeader) && (
                     <button
                       onClick={() => setLocation("/practice")}
                       className="text-xs text-primary hover:underline mt-2 block mx-auto font-bold"
@@ -186,7 +186,7 @@ export default function Home() {
             <span className="rounded-full bg-amber-50 text-amber-700 px-3 py-1.5 text-xs font-black">遅刻 {myAttendance?.lateCount ?? 0}</span>
             <span className="rounded-full bg-sky-50 text-sky-700 px-3 py-1.5 text-xs font-black">早退 {myAttendance?.earlyLeaveCount ?? 0}</span>
           </div>
-          {user?.role === "admin" && (
+          {(user?.isTeacher || user?.isPresident) && (
             <button onClick={() => setLocation("/admin/organizer")} className="text-xs font-black text-violet-700 hover:underline">全員の記録を管理 →</button>
           )}
         </CardContent>

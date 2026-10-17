@@ -44,10 +44,10 @@ export default function OrganizerDashboard() {
     type: "practice" as "practice" | "event" | "lesson" | "concert" | "holiday",
   });
   const { data: attendance, isLoading: attendanceLoading } = trpc.attendance.all.useQuery(undefined, {
-    enabled: user?.role === "admin",
+    enabled: Boolean(user?.isPresident || user?.isTeacher),
   });
   const { data: todayPractice } = trpc.practice.today.useQuery(undefined, {
-    enabled: user?.role === "admin",
+    enabled: Boolean(user?.isPresident || user?.isTeacher),
   });
   const createSchedule = trpc.schedules.create.useMutation({
     onSuccess: () => {
@@ -68,12 +68,12 @@ export default function OrganizerDashboard() {
     createSchedule.mutate(scheduleForm);
   };
 
-  if (user?.role !== "admin") {
+  if (!user?.isPresident && !user?.isTeacher) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-center">
         <div>
           <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-          <h1 className="font-black text-xl">運営ダッシュボードはorganizer専用です</h1>
+          <h1 className="font-black text-xl">運営ダッシュボードは部長・顧問専用です</h1>
           <p className="text-sm text-muted-foreground mt-2">部員は自分の出欠回数をダッシュボードで確認できます。</p>
         </div>
       </div>

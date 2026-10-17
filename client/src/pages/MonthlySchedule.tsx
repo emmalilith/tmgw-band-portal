@@ -50,7 +50,7 @@ const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
 export default function MonthlySchedule() {
   const { user } = useAuth();
-  const canManage = user?.role === "admin" || user?.role === "section_leader";
+  const canManage = Boolean(user?.isTeacher || user?.isPresident || user?.isSectionLeader);
   const utils = trpc.useUtils();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -252,7 +252,7 @@ export default function MonthlySchedule() {
           <p className="text-sm text-muted-foreground mt-1 font-medium">月ごとの練習・イベント予定</p>
         </div>
         <div className="flex items-center gap-2">
-          {user?.role === "admin" && (
+          {(user?.isPresident || user?.isTeacher) && (
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setImageImportOpen(true)}>
               <ImageUp className="w-4 h-4" /> <span className="hidden sm:inline">画像から取り込む</span>
             </Button>

@@ -281,7 +281,7 @@ export default function EnsembleAttendance() {
                 <p className="text-sm text-muted-foreground mt-1">
                   合奏出欠を表示するには、運営が「本日の練習」でこの日を合奏として登録します。
                 </p>
-                {user?.role === "admin" && (
+                {(user?.isTeacher || user?.isPresident || user?.isSectionLeader) && (
                   <Button className="mt-4" onClick={() => setLocation("/practice")}>合奏練習を登録する</Button>
                 )}
               </CardContent>
