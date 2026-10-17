@@ -210,6 +210,23 @@ export default function MonthlySchedule() {
     setImportRows((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
 
+  const addManualImportRow = () => {
+    const fallback = /^\d{4}-\d{2}$/.test(importMonth) ? importMonth : format(new Date(), "yyyy-MM");
+    setImportRows((rows) => [
+      ...rows,
+      {
+        id: `manual-${Date.now()}`,
+        title: "",
+        scheduleDate: `${fallback}-01`,
+        startTime: "",
+        endTime: "",
+        location: "",
+        description: "画像を確認して手入力",
+        type: "practice",
+      },
+    ]);
+  };
+
   const saveImportedRows = () => {
     const validRows = importRows
       .map(({ id: _id, ...row }) => ({ ...row, title: row.title.trim(), scheduleDate: row.scheduleDate.trim() }))
@@ -424,7 +441,12 @@ export default function MonthlySchedule() {
               </div>
             )}
             {!isReadingImage && ocrStatus && (
-              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">{ocrStatus}</div>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 space-y-2">
+                <p>{ocrStatus}</p>
+                {importRows.length === 0 && (
+                  <Button type="button" variant="outline" size="sm" onClick={addManualImportRow}>画像を見ながら手入力する</Button>
+                )}
+              </div>
             )}
             {!isReadingImage && ocrRawText && (
               <details className="rounded-xl border bg-muted/30 p-3 text-xs">
